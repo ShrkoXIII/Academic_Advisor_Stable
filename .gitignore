@@ -1,0 +1,51 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Testing and development
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# IDE
+.idea/
+
+# Build outputs
+build/
+dist/
+
+# Logs
+*.log
+*.tmp
+*.bak
+
+# Raw and generated data
+/data/**
+!/data/**/
+!/data/**/.gitkeep
+
+# Trained models
+/models/**
+!/models/**/
+!/models/**/.gitkeep
+
+# Historical artifacts
+/artifacts/**
+!/artifacts/**/
+!/artifacts/**/.gitkeep
+
+# Local generated results
+/results/

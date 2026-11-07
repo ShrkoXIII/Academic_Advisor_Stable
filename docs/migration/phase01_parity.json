@@ -1,0 +1,106 @@
+{
+  "source_files": [
+    {
+      "source": "src/data/cleaning_utils.py",
+      "destination": "src/data/cleaning/cleaning_utils.py",
+      "text_equal_except_imports": true,
+      "non_import_ast_identical": true,
+      "destination_sha256": "026680f3023fde7d109865f57d94a2468c394da3b5a06d547937bbadd4649723"
+    },
+    {
+      "source": "src/data/clean_degree_course.py",
+      "destination": "src/data/cleaning/clean_degree_course.py",
+      "text_equal_except_imports": true,
+      "non_import_ast_identical": true,
+      "destination_sha256": "58431cebb157b3dcb9ff9736b4154bf790850248de786e6f4348a9c925ed8659"
+    },
+    {
+      "source": "src/data/clean_student_course.py",
+      "destination": "src/data/cleaning/clean_student_course.py",
+      "text_equal_except_imports": true,
+      "non_import_ast_identical": true,
+      "destination_sha256": "bbc141fa2a3721b41ea801e33e4e12bab7f842f2083c25b4437f7b5985f64047"
+    },
+    {
+      "source": "src/data/clean_student_status.py",
+      "destination": "src/data/cleaning/clean_student_status.py",
+      "text_equal_except_imports": true,
+      "non_import_ast_identical": true,
+      "destination_sha256": "58235704476d8d54c3b5ac6e62f6b236dbf04b0a3f8186e3a8b6646c41e2a9ba"
+    },
+    {
+      "source": "src/data/clean_student_diploma.py",
+      "destination": "src/data/cleaning/clean_student_diploma.py",
+      "text_equal_except_imports": true,
+      "non_import_ast_identical": true,
+      "destination_sha256": "e0b519d61a341b057bb7aefbf6cf1323e23b4a25e3aae54277d8e3ec8e70942a"
+    },
+    {
+      "source": "src/data/clean_outliers.py",
+      "destination": "src/data/cleaning/clean_outliers.py",
+      "text_equal_except_imports": true,
+      "non_import_ast_identical": true,
+      "destination_sha256": "6d8b4c9e80741cfa7dcac8920eb122f0815aaa4b69adf5dfabe37bab9b676070"
+    },
+    {
+      "source": "src/data/academic_calendar.py",
+      "destination": "src/data/academic_calendar.py",
+      "text_equal_except_imports": true,
+      "non_import_ast_identical": true,
+      "destination_sha256": "3a5691d1a32f782baca2debbfe4d95ec899f4f1d550c2b4a8f81d7b08ff4fa9d"
+    }
+  ],
+  "test_files": [
+    {
+      "source": "tests/test_clean_utils.py",
+      "destination": "tests/unit/test_clean_utils.py",
+      "text_equal_except_import_resolution": true,
+      "test_bodies_decorators_and_assertions_identical": true,
+      "destination_sha256": "46d7bdef796c5c7ae40f406e151e33dbc9491b09826d6aeef9bd6c195460c9e5"
+    },
+    {
+      "source": "tests/test_clean_degree_course.py",
+      "destination": "tests/unit/test_clean_degree_course.py",
+      "text_equal_except_import_resolution": true,
+      "test_bodies_decorators_and_assertions_identical": true,
+      "destination_sha256": "b7aa424f50682900351ec97f1b47c2aca4d26fd8f32a6d937332f13e30361bef"
+    },
+    {
+      "source": "tests/test_clean_student_course.py",
+      "destination": "tests/unit/test_clean_student_course.py",
+      "text_equal_except_import_resolution": true,
+      "test_bodies_decorators_and_assertions_identical": true,
+      "destination_sha256": "b94ab501ee92d3491a8070af370920da85668159fd4e4be70c8192df724bfeea"
+    },
+    {
+      "source": "tests/test_clean_student_status.py",
+      "destination": "tests/unit/test_clean_student_status.py",
+      "text_equal_except_import_resolution": true,
+      "test_bodies_decorators_and_assertions_identical": true,
+      "destination_sha256": "a6e27d9628edf252e086df0f1b6b4e74d3980f82ad5b399465f2fa2ef7afbc0b"
+    },
+    {
+      "source": "tests/test_clean_student_diploma.py",
+      "destination": "tests/unit/test_clean_student_diploma.py",
+      "text_equal_except_import_resolution": true,
+      "test_bodies_decorators_and_assertions_identical": true,
+      "destination_sha256": "58b797ba566ae18361ef461e3e625e593e0f1f6f9303e4d7ff16a38e2fc72f83"
+    },
+    {
+      "source": "tests/test_clean_outliers.py",
+      "destination": "tests/unit/test_clean_outliers.py",
+      "text_equal_except_import_resolution": true,
+      "test_bodies_decorators_and_assertions_identical": true,
+      "destination_sha256": "622ffa52fa90f6371f96fd30836c6487754503f83f58f4c913dd93ba602997df"
+    },
+    {
+      "source": "tests/test_academic_calendar.py",
+      "destination": "tests/unit/test_academic_calendar.py",
+      "text_equal_except_import_resolution": true,
+      "test_bodies_decorators_and_assertions_identical": true,
+      "destination_sha256": "a46f560cdb38d0b6cdfbdb846e9741359ba37974a3c86d55f7215caeca4a5306"
+    }
+  ],
+  "source_files_checked": 7,
+  "test_files_checked": 7
+}

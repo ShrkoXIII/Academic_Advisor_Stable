@@ -49,3 +49,6 @@ dist/
 
 # Local generated results
 /results/
+/.api-state/
+/release/
+Agents.md

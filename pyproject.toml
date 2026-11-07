@@ -7,18 +7,27 @@ name = "academic-advisor-stable"
 version = "0.1.0"
 description = "Academic course recommendation system"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 
-dependencies = []
+dependencies = [
+    "pandas",
+    "pyarrow",
+    "numpy",
+    "lightgbm>=4.6",
+    "scikit-learn>=1.6",
+]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=8.0"
+    "pytest>=8.0",
+    "httpx>=0.27,<1",
 ]
+api = ["fastapi>=0.115,<1", "uvicorn>=0.30,<1", "pydantic>=2,<3"]
+ui = ["streamlit>=1.35,<2", "requests>=2.31,<3", "python-dotenv>=1,<2"]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["src", "src.*"]
+include = ["src", "src.*", "tools", "tools.*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,0 +1,28 @@
+{
+  "source_files_hashed": 16,
+  "source_files_changed": [],
+  "source_git_status_unchanged": true,
+  "destination_branch": "data_cleaning",
+  "destination_revision": "a8354b9a0f32a7bfb98e1f9f03e924e267bff427",
+  "git_diff_check_exit_code": 0,
+  "tests": {
+    "tests": 219,
+    "errors": 0,
+    "failures": 0,
+    "skipped": 0
+  },
+  "tests_by_module": {
+    "test_academic_calendar": 18,
+    "test_clean_degree_course": 6,
+    "test_clean_outliers": 65,
+    "test_clean_student_course": 61,
+    "test_clean_student_diploma": 8,
+    "test_clean_student_status": 37,
+    "test_clean_utils": 24
+  },
+  "independent_review": {
+    "critical_code_findings": 0,
+    "important_code_findings": 0,
+    "documentation_correction": "All four raw inputs are present; only the Data Building intermediate is missing."
+  }
+}

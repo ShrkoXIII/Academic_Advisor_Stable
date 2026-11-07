@@ -1,0 +1,29 @@
+{
+  "phase": "01",
+  "source_repository": "Academic_Advisor_Simple",
+  "destination_repository": "Academic_Advisor_Stable",
+  "source_revision": "f20db50e86a614b22faef97df4bedaae467b71e6",
+  "source_working_copy": true,
+  "source_dirty_cleaning_files": [
+    "src/data/clean_student_status.py"
+  ],
+  "source_sha256": {
+    "src/data/cleaning_utils.py": "204448f8124a7947610df18be82be70b19d8fb19164818b34b58730e334f1574",
+    "src/data/clean_degree_course.py": "13649b4ce614b32e878099725c5b456b7647ed2541ee8628a8ff7b49c686c06c",
+    "src/data/clean_student_course.py": "74d9f8c096c918bfc4c159237baa5c64b1cafe62c70960393391e84764bb24aa",
+    "src/data/clean_student_status.py": "e36bf64c939c25194d46db83c6b9342b625e0317e29c70b223c2767214d48806",
+    "src/data/clean_student_diploma.py": "b237506e6d35045b4404be53b3eda1f9eedbd075cbdcc54fe1ac01d2420e9da0",
+    "src/data/clean_outliers.py": "0c51693f76ab25a69405b289938490333849b09e337c4d0101b4658c4e9b822e",
+    "src/data/academic_calendar.py": "3a5691d1a32f782baca2debbfe4d95ec899f4f1d550c2b4a8f81d7b08ff4fa9d",
+    "tests/test_clean_utils.py": "6b7cdec32508a5271326828bf9e605b8d6cedeadeb3b5ea5cb8d57fa1b44a588",
+    "tests/test_clean_degree_course.py": "3aaf7b61338617192c6cf4a5d5ed453f02d052501ff03010767d558d391bde8a",
+    "tests/test_clean_student_course.py": "d39ba21214096585c86f22e9dab268d936b18037ed5749d795fd8d94e042ab7e",
+    "tests/test_clean_student_status.py": "ab940c1ae58b6b85cd64ee2fff2723b26f9d7ca756cd49a5e682dd4bb6e2b2d3",
+    "tests/test_clean_student_diploma.py": "c9fd1147918d072a922fe2b9903ce8f7b82f785910e82cff67789540206caec2",
+    "tests/test_clean_outliers.py": "0319f1797c33e95c7b1ebf30ff0c2a088aa9cc131f3f622ba7b0e250f4eff03c",
+    "tests/test_academic_calendar.py": "ca2bdc6aa4b97ce7098edc53e21e6afcb98f23f2a9f0c9a39c6421a10b413d76",
+    "src/paths.py": "14dc27af6830679955f4478dd21f7006dee32fe840375ebe35efbac602bfedcb",
+    "pyproject.toml": "1a03b9d4716d02e27ac25b32b2457aa069e2407b63759080a7e06ad43692b250"
+  },
+  "source_status_sha256": "ebde4d37e9e2f1c37a265ed0776a94c0c122564a7a63e873ea5ce77e79e47433"
+}

@@ -1,0 +1,31 @@
+{
+  "python": "3.11.5",
+  "versions": {
+    "academic-advisor-stable": "0.1.0",
+    "pandas": "3.0.5",
+    "pyarrow": "25.0.1",
+    "numpy": "2.4.6",
+    "pytest": "9.1.1"
+  },
+  "canonical_artifact_paths": {
+    "STUDENT_COURSE_PATH": "data/raw/v_crg_student_course_raw.parquet",
+    "STUDENT_STATUS_PATH": "data/raw/v_add_student_degree_status.parquet",
+    "DEGREE_COURSE_PATH": "data/raw/v_acd_degree_course.parquet",
+    "ACADEMIC_INFO_PATH": "data/raw/v_add_academic_info.parquet",
+    "PRE_COMMON_STUDENT_COURSE_PATH": "data/clean/student_course_pre_common.parquet",
+    "PRE_COMMON_STUDENT_STATUS_PATH": "data/clean/student_status_pre_common.parquet",
+    "CLEAN_DEGREE_COURSE_PATH": "data/clean/degree_course.parquet",
+    "CLEAN_STUDENT_DIPLOMA_PATH": "data/clean/student_diploma.parquet",
+    "STUDENT_COURSE_ENRICHED_PATH": "data/clean/student_course_enriched.parquet",
+    "STUDENT_COURSE_DIPLOMA_PATH": "data/merged/student_course_enriched_with_diploma.parquet",
+    "STUDENT_COURSE_WITHOUT_OUTLIERS_PATH": "data/merged/student_course_enriched_without_outliers.parquet",
+    "OUTLIER_STUDENTS_AUDIT_PATH": "data/merged/outlier_students.parquet"
+  },
+  "all_paths_under_project_root": true,
+  "unique_artifact_paths": true,
+  "versioned_path_constants": false,
+  "imports_use_destination_only": true,
+  "relocated_imports_and_paths": true,
+  "missing_real_raw_inputs": [],
+  "missing_building_input": "data/clean/student_course_enriched.parquet"
+}

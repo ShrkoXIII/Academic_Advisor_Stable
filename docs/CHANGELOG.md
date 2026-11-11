@@ -108,3 +108,9 @@
 - Clarified canonical paths, branches, and staging labels in `src/{main,paths}.py`, `src/data/building/filter_common_students.py`, `src/features/{build_frozen_history,frozen_history}.py`, `src/modeling/build_artifact_manifest.py`, `src/recommendation/two_stage_artifacts.py`, and `README.md`.
 - Updated `tests/unit/test_{main_runner,frozen_history,filter_common_students}.py`: 28 focused and 837 relevant unit tests passed; 67 source imports/compilation, 49 unique paths, dependency connections, and CLI checks passed without executing pipeline stages or training.
 - Preserved data/models/manifests and all 11 shortlist input/source hashes; the build manifest retains historical source fingerprints for five edited files. No datasets, history, models, or evaluation artifacts were rebuilt, overwritten, published, or deleted.
+
+## 2026-11-11 — Remove Average-Attempt Features
+- Removed `plan_course_type_id` and all average-attempt model signals; contracts now expose 31 Stage 1 and 43 Stage 2 features (feature version 3).
+- Removed `attempt_sum` from frozen history and finalized delta rows; retained `attempt_number`, retake-rate features, and `retake_sum`; updated `src/features/`, `src/modeling/`, `src/recommendation/`, and `src/api/`.
+- Updated cumulative baseline provenance to distinguish source and newly serialized history hashes; documented the new model contract in `docs/api_contract.md`.
+- Validation: 193 focused tests passed; full unit collection is blocked by missing `pydantic`. Models were not retrained and data/history artifacts were not rebuilt.

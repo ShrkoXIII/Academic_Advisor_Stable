@@ -18,7 +18,7 @@ def test_observed_forecast_uses_full_plan_context_and_ignores_target_results(tmp
     pd.testing.assert_frame_equal(forecast["courses"], again["courses"])
     assert forecast["summary"]["total_credits"] == 9
     matrix = engine.artifacts.stage2.grade_model.matrices[-1]
-    assert matrix.shape == (3, 47) and matrix.plan_course_count.eq(3).all()
+    assert matrix.shape == (3, 43) and matrix.plan_course_count.eq(3).all()
     assert not {"final_mark", "points", "gpa_points"}.intersection(matrix.columns)
 
 

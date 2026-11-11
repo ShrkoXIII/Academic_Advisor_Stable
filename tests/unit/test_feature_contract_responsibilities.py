@@ -55,7 +55,7 @@ class FeatureContractResponsibilitiesTests(unittest.TestCase):
         )
         result = prepare_model_matrix(source, learn_category_levels(fit))
 
-        self.assertEqual(FEATURE_ENGINEERING_VERSION, 2)
+        self.assertEqual(FEATURE_ENGINEERING_VERSION, 3)
         self.assertEqual(BASE_FEATURES, [*NUMERIC_FEATURES, *CATEGORICAL_FEATURES])
         self.assertEqual(result.columns.tolist(), BASE_FEATURES)
         self.assertTrue(set(BASE_FEATURES).isdisjoint(LEAKAGE_COLUMNS))
@@ -66,6 +66,20 @@ class FeatureContractResponsibilitiesTests(unittest.TestCase):
         category = result[CATEGORICAL_FEATURES[0]]
         self.assertEqual(category.tolist(), ["__MISSING__", "__UNKNOWN__"])
         self.assertEqual(category.cat.categories.tolist(), ["__MISSING__", "__UNKNOWN__", "known"])
+
+    def test_removed_signals_are_absent_from_the_training_matrix(self):
+        from src.features.feature_contract import BASE_FEATURES
+
+        removed = {
+            "plan_course_type_id",
+            "course_history_avg_attempt",
+            "plan_credit_weighted_avg_attempt",
+            "peer_credit_weighted_avg_attempt",
+        }
+
+        self.assertEqual(FEATURE_ENGINEERING_VERSION, 3)
+        self.assertEqual(len(BASE_FEATURES), 43)
+        self.assertTrue(removed.isdisjoint(BASE_FEATURES))
 
     def test_modeling_targets_and_training_weights_preserve_values(self):
         from src.modeling import training_config

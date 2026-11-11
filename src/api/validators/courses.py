@@ -145,24 +145,20 @@ def validate_previous_course_status(raw, values, field, expected, context, polic
 
 
 def validate_course_catalog(values, catalog, field, result):
-    """Resolve course type from the compatible catalog and compare properties."""
+    """Compare candidate properties with the compatible catalog."""
     course, credits = values["course"], values["credits"]
     maximum, requirement = values["maximum"], values["requirement"]
     if catalog is None:
-        course_type = None
-        result.unavailable_fields.append("plan_course_type_id")
-    else:
-        if course not in catalog.index:
-            raise ApiError("UNRESOLVED_COURSE_TYPE", "Course is absent from the selected degree catalog.", field=field)
-        row = catalog.loc[course]
-        course_type = identifier(row.course_type_id, "catalog.course_type_id")
-        for external, internal in ((credits, "course_credits"), (maximum, "credits_count"),
-                                   (values["year"], "year_order"), (values["semester"], "semester_order")):
-            if external != number(row[internal], "catalog." + internal):
-                raise ApiError("CATALOG_CONFLICT", "Source course properties conflict with the catalog.", field=field)
-        if requirement != identifier(row.requirement_type_id, "catalog.requirement_type_id"):
-            raise ApiError("CATALOG_CONFLICT", "Requirement classification conflicts with the catalog.", field=field)
-    return course_type
+        return
+    if course not in catalog.index:
+        raise ApiError("UNRESOLVED_COURSE_TYPE", "Course is absent from the selected degree catalog.", field=field)
+    row = catalog.loc[course]
+    for external, internal in ((credits, "course_credits"), (maximum, "credits_count"),
+                               (values["year"], "year_order"), (values["semester"], "semester_order")):
+        if external != number(row[internal], "catalog." + internal):
+            raise ApiError("CATALOG_CONFLICT", "Source course properties conflict with the catalog.", field=field)
+    if requirement != identifier(row.requirement_type_id, "catalog.requirement_type_id"):
+        raise ApiError("CATALOG_CONFLICT", "Requirement classification conflicts with the catalog.", field=field)
 
 
 def validate_group_policy(values, policy, field, result):

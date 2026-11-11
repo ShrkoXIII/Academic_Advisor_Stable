@@ -43,8 +43,8 @@ def test_http_recommendation_runs_both_stages_and_alias(api_client):
     assert result.status_code == 200, result.json()
     body = result.json()
     assert body["status"] == "ok" and len(body["recommendations"]) == 3
-    assert engine.artifacts.stage1.grade_model.matrices[-1].shape[1] == 33
-    assert engine.artifacts.stage2.grade_model.matrices[-1].shape[1] == 47
+    assert engine.artifacts.stage1.grade_model.matrices[-1].shape[1] == 31
+    assert engine.artifacts.stage2.grade_model.matrices[-1].shape[1] == 43
     assert post(client, request, "/recommend").json() == body
 
 

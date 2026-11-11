@@ -42,7 +42,7 @@ def ready_payloads(size=8, *, credits=3, target=12, part=20251):
         records.append({
             "course_id": f"C{index:02d}", "course_name": f"Synthetic Course {index}",
             "course_credits": credits, "attempt_number": 1 if index > 1 else 2,
-            "plan_course_type_id": "T", "plan_requirement_type_id": "R",
+            "plan_requirement_type_id": "R",
             "plan_year_order": 1, "plan_semester_order": 1, "plan_credits_count": 120,
             "previous_course_status": "FAILED" if index == 0 else (
                 "WITHDRAWN" if index == 1 else "NEW"),
@@ -124,5 +124,5 @@ def new_history_delta(part=20251):
         {"degree_id": "D", "faculty_id": "F", "course_id": "C00",
          "plan_requirement_type_id": "R", "course_credits": 3,
          "count": 20, "fail_count": 0, "retake_count": 0,
-         "mark_sum": 1800, "attempt_sum": 20},
+         "mark_sum": 1800},
     ]}

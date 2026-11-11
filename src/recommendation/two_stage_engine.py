@@ -1,4 +1,4 @@
-"""Payload-driven 33 -> at most 50 -> 47 core with manifest-gated activation.
+"""Payload-driven 31 -> at most 50 -> 43 core with manifest-gated activation.
 
 Production loads approved policies; evaluation choices remain explicit. No
 Backend transport or local joins. Operational service limits remain unresolved.

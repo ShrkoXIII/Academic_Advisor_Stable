@@ -43,7 +43,7 @@ def payload(part=20252):
     return {"delta_part": part, "finalized": True, "aggregates": [
         {"part_id": part, "degree_id": "D", "course_id": "C", "faculty_id": "F",
          "plan_requirement_type_id": "R", "course_credits": 3, "count": 2,
-         "mark_sum": 120, "fail_count": 1, "attempt_sum": 3, "retake_count": 1},
+         "mark_sum": 120, "fail_count": 1, "retake_count": 1},
     ]}
 
 
@@ -91,7 +91,9 @@ def test_approved_initialization_preserves_full_weighted_history_and_source(tmp_
     assert metadata["baseline_completeness"] == "admin_attested"
     assert "baseline_approval_reference" not in metadata
     assert metadata["baseline_source_metadata_sha256"] == file_sha256(old / "as_of_20251/metadata.json")
-    assert metadata["artifact_sha256"]["course_history_state.pkl"] == file_sha256(old / "as_of_20251/course_history_state.pkl")
+    assert metadata["artifact_sha256"]["course_history_state.pkl"] == metadata["new_history_sha256"]
+    assert metadata["baseline_source_history_sha256"] == file_sha256(old / "as_of_20251/course_history_state.pkl")
+    assert metadata["artifact_sha256"]["course_history_state.pkl"] != metadata["baseline_source_history_sha256"]
     assert store.status()["active_historical_cutoff"] == 20251
     for level in baseline.tables:
         assert_frame_equal(loaded.tables[level], baseline.tables[level])
@@ -544,7 +546,7 @@ def test_inexact_cumulative_statistics_reject_commit_without_publication(tmp_pat
     store, baseline, _ = initialize(tmp_path)
     data = payload()
     data["aggregates"][0].update(count=count, mark_sum=50 * count,
-                                 fail_count=0, retake_count=0, attempt_sum=count)
+                                 fail_count=0, retake_count=0)
     before = {p.name: file_sha256(p) for p in (store.root / "as_of_20251").iterdir()}
     with pytest.raises(ValueError, match="exact"):
         commit(store, data)

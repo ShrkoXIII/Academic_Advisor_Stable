@@ -25,6 +25,7 @@ from src.features.temporal_features import (  # noqa: E402
     CourseHistoryState,
     add_student_history_features,
     build_temporal_course_history,
+    compute_student_gpa_history,
     compute_plan_context_features,
     load_course_history_state,
     save_course_history_state,
@@ -150,6 +151,7 @@ class CourseHistoryTests(unittest.TestCase):
         self.assertAlmostEqual(features["course_history_effective_support"], 1.25)
         self.assertAlmostEqual(features["course_history_avg_mark"], 72.0)
         self.assertAlmostEqual(features["course_history_fail_rate"], 0.2)
+        self.assertNotIn("course_history_avg_attempt", features.index)
 
     def test_test_outcomes_cannot_update_frozen_train_state(self):
         state = CourseHistoryState()
@@ -172,9 +174,10 @@ class PlanContextTests(unittest.TestCase):
             "course_credits": [2.0, 3.0, 5.0, 7.0, 11.0],
             "course_history_fail_rate": [0.1, 0.4, 0.9, 0.8, 0.7],
             "course_history_avg_mark": [90.0, 60.0, 20.0, 30.0, 40.0],
-            "course_history_avg_attempt": [1.0, 2.0, 3.0, 4.0, 5.0],
         })
         result = compute_plan_context_features(roster)
+        self.assertNotIn("plan_credit_weighted_avg_attempt", result.columns)
+        self.assertNotIn("peer_credit_weighted_avg_attempt", result.columns)
         self.assertEqual(result.plan_course_count.tolist(), [2, 2, 1, 1, 1])
         self.assertEqual(result.plan_total_credits.tolist(), [5.0, 5.0, 5.0, 7.0, 11.0])
         self.assertAlmostEqual(result.loc[0, "peer_credit_weighted_fail_rate"], 0.4)
@@ -189,7 +192,6 @@ class PlanContextTests(unittest.TestCase):
             "course_credits": [3.0] * 4,
             "course_history_fail_rate": [0.6, 0.6, 0.2, np.nan],
             "course_history_avg_mark": [40.0, 50.0, 80.0, np.nan],
-            "course_history_avg_attempt": [2.0, 2.0, 1.0, np.nan],
         })
         result = compute_plan_context_features(roster)
         self.assertEqual(result.peer_max_fail_rate.tolist(), [0.6] * 4)
@@ -205,7 +207,6 @@ class PlanContextTests(unittest.TestCase):
                 "course_credits": [2.0, 6.0, 2.0],
                 "course_history_fail_rate": [0.1, 0.5, np.nan],
                 "course_history_avg_mark": [90.0, 60.0, np.nan],
-                "course_history_avg_attempt": [1.0, 2.0, np.nan],
             }
         )
         features = compute_plan_context_features(roster)
@@ -230,6 +231,19 @@ class PlanContextTests(unittest.TestCase):
 
 
 class StudentHistoryTests(unittest.TestCase):
+    def test_previous_gpa_uses_prior_registered_semester(self):
+        status = pd.DataFrame({
+            "student_status_id": ["S1", "S2"],
+            "student_id": ["STUDENT", "STUDENT"],
+            "part_id": [20241, 20242],
+            "semester_reg_courses": [2, 1],
+            "gpa_points": [3.1, 3.4],
+        })
+
+        result = compute_student_gpa_history(status)
+
+        self.assertEqual(result.loc[1, "gpa_prev_1"], 3.1)
+
     def test_current_and_future_results_cannot_change_current_history(self):
         history = semester_rows("S1", [20241, 20242, 20243], [2.0, 0.0, 4.0])
         empty = history.iloc[:0]

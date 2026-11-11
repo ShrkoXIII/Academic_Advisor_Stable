@@ -45,7 +45,6 @@ def synthetic_candidates(size=6):
     rows["course_id"] = list("ABCDEF")[:size]
     rows["course_name"] = [f"Synthetic course {course}" for course in rows.course_id]
     rows["course_credits"] = 3.
-    rows["plan_course_type_id"] = "T"
     rows["plan_requirement_type_id"] = "R"
     return rows
 

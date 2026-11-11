@@ -30,7 +30,7 @@ STUDENT_SNAPSHOT_COLUMNS = [
     "observed_gap_semesters", "diploma_gpa", "diploma_type_id", "degree_credits_count",
 ]
 CANDIDATE_COURSE_COLUMNS = [
-    "course_id", "course_credits", "attempt_number", "plan_course_type_id",
+    "course_id", "course_credits", "attempt_number",
     "plan_requirement_type_id", "plan_year_order", "plan_semester_order", "plan_credits_count",
 ]
 
@@ -102,11 +102,11 @@ def normalize_candidates(raw, catalog, course_history, student_id, degree_id, pa
         raise CandidateImportError(report)
     catalog = catalog.rename(columns={
         "course_credits": "catalog_credits", "course_name_sl": "catalog_name",
-        "course_type_id": "plan_course_type_id", "requirement_type_id": "plan_requirement_type_id",
+        "requirement_type_id": "plan_requirement_type_id",
         "year_order": "plan_year_order", "semester_order": "plan_semester_order",
         "credits_count": "plan_credits_count",
     })
-    cols = ["course_id", "catalog_credits", "catalog_name", "plan_course_type_id",
+    cols = ["course_id", "catalog_credits", "catalog_name",
             "plan_requirement_type_id", "plan_year_order", "plan_semester_order", "plan_credits_count"]
     rows = rows.merge(catalog[cols], on="course_id", how="left", validate="one_to_one", indicator=True)
     report["unmatched_course_ids"] = rows.loc[rows._merge.eq("left_only"), "course_id"].tolist()
@@ -319,7 +319,7 @@ def normalize_candidate_payloads(records, snapshot):
         if missing:
             raise ValueError(f"Incomplete Backend candidate: {sorted(missing)}")
         row = {key: record[key] for key in [*CANDIDATE_COURSE_COLUMNS, "course_name"]}
-        for key in ("course_id", "plan_course_type_id", "plan_requirement_type_id"):
+        for key in ("course_id", "plan_requirement_type_id"):
             row[key] = _payload_id(row[key], key)
         row["course_credits"] = _payload_number(row["course_credits"], "course_credits", nonnegative=True)
         attempt = _payload_number(row["attempt_number"], "attempt_number")

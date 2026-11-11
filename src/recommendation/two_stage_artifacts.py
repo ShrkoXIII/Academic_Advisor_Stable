@@ -46,11 +46,11 @@ def stage_feature_contract(stage):
         raise ValueError(f"Unknown model stage: {stage!r}")
     removed = set(PLAN_CONTEXT_COLUMNS) if stage == "stage1" else set()
     features = [name for name in BASE_FEATURES if name not in removed]
-    if (len(BASE_FEATURES) != 47 or len(set(BASE_FEATURES)) != 47
-            or len(PLAN_CONTEXT_COLUMNS) != 14 or len(set(PLAN_CONTEXT_COLUMNS)) != 14
+    if (len(BASE_FEATURES) != 43 or len(set(BASE_FEATURES)) != 43
+            or len(PLAN_CONTEXT_COLUMNS) != 12 or len(set(PLAN_CONTEXT_COLUMNS)) != 12
             or not set(PLAN_CONTEXT_COLUMNS).issubset(NUMERIC_FEATURES)
-            or len(features) != (33 if stage == "stage1" else 47)):
-        raise ValueError("Two-stage artifacts require the approved 47-minus-14 contract.")
+            or len(features) != (31 if stage == "stage1" else 43)):
+        raise ValueError("Two-stage artifacts require the approved 43-minus-12 contract.")
     contract = {
         "model_features": features,
         "numeric_features": [name for name in NUMERIC_FEATURES if name in features],

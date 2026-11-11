@@ -52,7 +52,7 @@ def _course(raw, index, expected, context, policy, catalog, candidates, seen, gr
               "plan_credits_count": maximum, "requirement_group_id": group_id}
     status, reason = validate_previous_course_status(raw, values, field, expected, context, policy, result)
     record["previous_course_status"] = status
-    record["plan_course_type_id"] = validate_course_catalog(values, catalog, field, result)
+    validate_course_catalog(values, catalog, field, result)
     mode, overflow = validate_group_policy(values, policy, field, result)
     if mode == "strict_remaining":
         group_policies[group_id] = sum_credit_values((maximum, passed.copy_negate()))

@@ -24,11 +24,11 @@ def delta(part=20251):
         {"degree_id": "D", "course_id": "A", "faculty_id": "F",
          "plan_requirement_type_id": "R", "course_credits": 2.5,
          "count": 2, "fail_count": 1, "retake_count": 1,
-         "mark_sum": 120, "attempt_sum": 3},
+         "mark_sum": 120},
         {"degree_id": "E", "course_id": "B", "faculty_id": "G",
          "plan_requirement_type_id": "S", "course_credits": 0,
          "count": 1, "fail_count": 0, "retake_count": 0,
-         "mark_sum": 80, "attempt_sum": 1},
+         "mark_sum": 80},
     ]}
 
 
@@ -41,6 +41,19 @@ def weighted_state():
         "attempt_number": [2, 1], "final_mark": [40, 60],
     }))
     return state
+
+
+def test_average_attempt_sum_is_absent_from_history_storage_and_delta_contract():
+    state = weighted_state()
+    assert "attempt_sum" not in HISTORY_SUM_COLUMNS
+    assert "attempt_sum" not in state.global_sums
+    assert all("attempt_sum" not in table.columns for table in state.tables.values())
+    row = delta()["aggregates"][0]
+    assert "attempt_sum" not in row
+    with pytest.raises(ValueError, match="required keys or sums"):
+        api().normalize_history_delta({
+            **delta(), "aggregates": [{**row, "attempt_sum": 3}, *delta()["aggregates"][1:]],
+        })
 
 
 def save_initial(root, part=20243):
@@ -76,7 +89,7 @@ def test_aggregate_addition_preserves_weighted_prefix_and_matches_raw_oracle():
     updated = module.apply_history_delta(old, delta())
     assert updated.global_sums == {
         "effective_support": 4.25, "raw_count": 5.0, "mark_sum": 270.0,
-        "fail_sum": 1.25, "attempt_sum": 5.5, "retake_sum": 1.25,
+        "fail_sum": 1.25, "retake_sum": 1.25,
     }
     assert old.global_sums == before.global_sums
     assert (old.as_of_part, updated.as_of_part) == (20243, 20251)
@@ -103,7 +116,7 @@ def test_delta_identity_is_canonical_and_state_bytes_are_deterministic(tmp_path)
     second["delta_part"] = "20251.0"
     second["aggregates"].reverse()
     for row in second["aggregates"]:
-        for key in ("count", "fail_count", "retake_count", "mark_sum", "attempt_sum", "course_credits"):
+        for key in ("count", "fail_count", "retake_count", "mark_sum", "course_credits"):
             row[key] = str(float(row[key]))
         row["course_id"] = " " + row["course_id"] + " "
     a, b = module.normalize_history_delta(first), module.normalize_history_delta(second)
@@ -127,7 +140,7 @@ def test_delta_identity_is_canonical_and_state_bytes_are_deterministic(tmp_path)
     ("retake_count", 3), ("retake_count", -1),
     ("mark_sum", -1), ("mark_sum", 201), ("mark_sum", float("nan")),
     ("attempt_sum", 1), ("attempt_sum", 2.5), ("attempt_sum", float("inf")),
-    ("attempt_sum", 2), ("course_credits", -1), ("course_credits", "1e400"),
+    ("course_credits", -1), ("course_credits", "1e400"),
     ("degree_id", None), ("course_id", ""), ("faculty_id", "X||Y"),
 ])
 def test_invalid_aggregate_is_rejected_without_mutating_prefix(field, value):
@@ -198,7 +211,7 @@ def test_update_publishes_verified_immutable_bundle_and_lineage(tmp_path):
     assert meta["previous_history_sha256"] == before["as_of_20243/course_history_state.pkl"]
     assert meta["new_history_sha256"] == frozen.file_sha256(tmp_path / "as_of_20251/course_history_state.pkl")
     assert meta["delta_sha256"] == result["delta_sha256"]
-    assert meta["created_at"] and meta["feature_engineering_version"] == 2
+    assert meta["created_at"] and meta["feature_engineering_version"] == 3
     assert meta["source_row_count"] == 5 and meta["source_part_counts"]["20251"] == 3
     assert current.metadata["directory"] == str((tmp_path / "as_of_20251").resolve())
     assert all(hashes(tmp_path)[name] == digest for name, digest in before.items())
@@ -494,7 +507,7 @@ def test_distinct_full_credit_grains_reuse_existing_rounded_history_groups():
     module = api()
     payload = delta()
     row = dict(payload["aggregates"][0], count=1, fail_count=0, retake_count=0,
-               mark_sum=60, attempt_sum=1)
+               mark_sum=60)
     payload["aggregates"] = [
         dict(row, course_credits=credits) for credits in ("2.4", "2.5", "3")
     ] + [dict(row, course_credits="3", plan_requirement_type_id="S")]
@@ -520,16 +533,11 @@ def test_equivalent_credit_representations_are_duplicate_delta_grains():
         api().normalize_history_delta(payload)
 
 
-@pytest.mark.parametrize("statistic", ["count", "attempt_sum"])
-def test_integer_statistics_above_float64_exact_range_are_rejected(statistic):
+def test_count_above_float64_exact_range_is_rejected():
     payload = delta()
     row = dict(payload["aggregates"][0], count=1, mark_sum=60,
-               fail_count=0, retake_count=1, attempt_sum=2)
-    if statistic == "count":
-        row.update(count=2**53 + 1, mark_sum=50 * (2**53 + 1),
-                   retake_count=0, attempt_sum=2**53 + 1)
-    else:
-        row["attempt_sum"] = 2**53 + 1
+               fail_count=0, retake_count=0)
+    row.update(count=2**53 + 1, mark_sum=50 * (2**53 + 1))
     payload["aggregates"] = [row]
     with pytest.raises(ValueError, match="exact"):
         api().normalize_history_delta(payload)
@@ -539,11 +547,11 @@ def test_float64_exact_integer_boundary_is_preserved_in_normalized_frame():
     payload = delta()
     payload["aggregates"] = [dict(payload["aggregates"][0], count=2**53,
                                   mark_sum=50 * 2**53, fail_count=0,
-                                  retake_count=0, attempt_sum=2**53)]
+                                  retake_count=0)]
     normalized = api().normalize_history_delta(payload)
     frame = normalized.to_frame()
     assert normalized.rows[0][5] == str(2**53)
-    assert int(frame.iloc[0]["count"]) == int(frame.iloc[0]["attempt_sum"]) == 2**53
+    assert int(frame.iloc[0]["count"]) == 2**53
 
 
 def test_aggregate_addition_rejects_weight_loss_in_affected_table_group():
@@ -558,7 +566,7 @@ def test_aggregate_addition_rejects_weight_loss_in_affected_table_group():
     payload = delta()
     payload["aggregates"] = [dict(payload["aggregates"][0], course_credits=3,
                                   count=2**51, mark_sum=50 * 2**51,
-                                  fail_count=0, retake_count=0, attempt_sum=2**51)]
+                                  fail_count=0, retake_count=0)]
     # Global support is an exact integer; the affected course still has its
     # quarter-weight prefix, which float64 would lose when adding this delta.
     assert state.global_sums["effective_support"] == 1

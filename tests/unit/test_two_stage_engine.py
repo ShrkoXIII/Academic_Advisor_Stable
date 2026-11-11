@@ -104,7 +104,7 @@ def test_stage_one_predicts_n_rows_once_before_plan_constraints(tmp_path):
     for model in (engine.artifacts.stage1.grade_model, engine.artifacts.stage1.fail_model):
         assert len(model.matrices) == 1
         assert len(model.matrices[0]) == 8
-        assert len(model.matrices[0].columns) == 33
+        assert len(model.matrices[0].columns) == 31
         assert model.matrices[0].columns.tolist() == [name for name in BASE_FEATURES if name not in PLAN_CONTEXT_COLUMNS]
         assert not set(PLAN_CONTEXT_COLUMNS) & set(model.matrices[0].columns)
         assert model.matrices[0].prior_fail_credit_ratio.tolist() == pytest.approx([.73] * 8)
@@ -218,7 +218,7 @@ def test_prediction_clipping_applies_before_grade_scale_and_plan_aggregation(tmp
 
 
 
-def test_stage_two_fourteen_context_features_match_hand_calculated_zero_credit_plan(tmp_path):
+def test_stage_two_twelve_context_features_match_hand_calculated_zero_credit_plan(tmp_path):
     engine = evaluation_engine(engine_api().TwoStagePlanRecommender, tmp_path)
     student, request = ready_payloads(size=3)
     prepared = prepare_recommendation_payloads(student_payload=student, request_payload=request)
@@ -227,19 +227,16 @@ def test_stage_two_fourteen_context_features_match_hand_calculated_zero_credit_p
     rows["course_credits"] = [3., 2., 0.]
     rows["course_history_fail_rate"] = [.2, .6, .9]
     rows["course_history_avg_mark"] = [80., 60., 100.]
-    rows["course_history_avg_attempt"] = [1., 2., 3.]
     actual = engine._score_stage2(rows)
     # Zero credits contribute counts and peer maxima, but no weighted load.
     expected = pd.DataFrame({
         "plan_course_count": [3, 3, 3], "plan_total_credits": [5., 5., 5.],
         "plan_credit_weighted_fail_rate": [.36, .36, .36],
         "plan_credit_weighted_avg_mark": [72., 72., 72.],
-        "plan_credit_weighted_avg_attempt": [1.4, 1.4, 1.4],
         "plan_difficulty_credit_load": [1.8, 1.8, 1.8],
         "peer_course_count": [2, 2, 2], "peer_total_credits": [2., 3., 5.],
         "peer_credit_weighted_fail_rate": [.6, .2, .36],
         "peer_credit_weighted_avg_mark": [60., 80., 72.],
-        "peer_credit_weighted_avg_attempt": [2., 1., 1.4],
         "peer_difficulty_credit_load": [1.2, .6, 1.8],
         "peer_max_fail_rate": [.9, .9, .6], "peer_difficulty_missing": [0, 0, 0],
     })
@@ -299,7 +296,7 @@ def test_result_provenance_has_model_category_scale_history_and_input_hashes(tmp
         assert entry["models"]["grade"]["sha256"] == "1" * 64
         assert entry["models"]["fail"]["sha256"] == "2" * 64
         assert entry["category_levels"]["sha256"] == "3" * 64
-        assert entry["feature_contract"]["feature_count"] == (33 if stage == "stage1" else 47)
+        assert entry["feature_contract"]["feature_count"] == (31 if stage == "stage1" else 43)
     assert metadata["grade_scale_sha256"] == "4" * 64
     assert metadata["grade_scale_version"] == "sha256:" + "4" * 64
     assert len(metadata["history"]["artifact_sha256"]["course_history_state.pkl"]) == 64

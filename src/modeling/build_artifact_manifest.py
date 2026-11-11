@@ -1,4 +1,4 @@
-"""Publish existing 33-feature assets byte-for-byte; never train or regenerate.
+"""Publish version-compatible assets byte-for-byte; never train or regenerate.
 
 Run once from the repository root with:
     ./.venv/Scripts/python.exe -m src.modeling.build_artifact_manifest

@@ -7,7 +7,7 @@ from src.features.feature_contract import prepare_model_matrix
 
 def score_course_rows(rows, grade_model, fail_model, category_levels, grade_scale,
                       *, features=None, num_threads=4):
-    """Shared 33/47 prediction processing; callers supply the stage's features.
+    """Shared 31/43 prediction processing; callers supply the stage's features.
 
     History and plan context are prepared upstream. Marks become GradeScale
     points; failure probabilities remain an independent output.

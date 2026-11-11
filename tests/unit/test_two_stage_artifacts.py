@@ -91,7 +91,7 @@ def artifact_root(tmp_path, monkeypatch):
             })
         write_json(tmp_path / category_path, levels)
     official = {
-        "feature_engineering_version": 2,
+        "feature_engineering_version": 3,
         "feature_contract": expected_contract("stage2"),
         "targets": {"grade_regressor": "final_mark", "fail_risk_classifier": "(final_mark < 50).astype(int)"},
         "course_history": {"initial_history_cutoff": 20243, "test_state_frozen_after_part": 20251},
@@ -131,7 +131,7 @@ def artifact_root(tmp_path, monkeypatch):
     ]
     first_contract = expected_contract("stage1")
     source = {
-        "experiment": "course_only_recommendation", "dataset_version": "V2", "feature_engineering_version": 2,
+        "experiment": "course_only_recommendation", "dataset_version": "V2", "feature_engineering_version": 3,
         "feature_contract": {key: first_contract[key] for key in ["model_features", "feature_count", "removed_features"]},
         "training_as_of_part": 20243,
         "grade": {"selected_candidate": {"candidate": {"name": "capaciy_63"}}, "parameters": {"objective": "regression"}},
@@ -176,17 +176,17 @@ def mutate_manifest(root, mutation):
     write_json(path, manifest)
 
 
-def test_stage_contracts_derive_33_and_47_from_the_official_order():
+def test_stage_contracts_derive_31_and_43_from_the_official_order():
     artifacts = importlib.import_module("src.recommendation.two_stage_artifacts")
     first = artifacts.stage_feature_contract("stage1")
     second = artifacts.stage_feature_contract("stage2")
     assert first["model_features"] == [name for name in BASE_FEATURES if name not in PLAN_CONTEXT_COLUMNS]
     assert first["numeric_features"] == [name for name in NUMERIC_FEATURES if name not in PLAN_CONTEXT_COLUMNS]
     assert first["categorical_features"] == CATEGORICAL_FEATURES
-    assert first["feature_count"] == 33
+    assert first["feature_count"] == 31
     assert set(first["removed_features"]) == set(PLAN_CONTEXT_COLUMNS)
     assert second == {"model_features": BASE_FEATURES, "numeric_features": NUMERIC_FEATURES,
-                      "categorical_features": CATEGORICAL_FEATURES, "feature_count": 47}
+                      "categorical_features": CATEGORICAL_FEATURES, "feature_count": 43}
 
 
 def test_promotion_copies_exact_bytes_and_archives_original_provenance(artifact_root):
@@ -202,7 +202,7 @@ def test_promotion_copies_exact_bytes_and_archives_original_provenance(artifact_
     assert manifest == read_json(root / PROMOTED_DIR / "manifest.json")
     assert manifest["manifest_version"] == 1
     assert manifest["dataset_version"] == "V2"
-    assert manifest["feature_engineering_version"] == 2
+    assert manifest["feature_engineering_version"] == 3
     for stage in ["stage1", "stage2"]:
         entry = manifest["stages"][stage]
         assert entry["feature_contract"] == expected_contract(stage)
@@ -238,8 +238,8 @@ def test_promoted_pair_produces_the_same_synthetic_predictions(artifact_root):
         original_model = FakeBooster(root / SOURCE_DIR / original)
         copied_model = getattr(bundle.stage1, f"{role}_model")
         np.testing.assert_array_equal(original_model.predict(rows), copied_model.predict(rows))
-    assert bundle.stage1.grade_model.num_feature() == 33
-    assert bundle.stage2.grade_model.num_feature() == 47
+    assert bundle.stage1.grade_model.num_feature() == 31
+    assert bundle.stage2.grade_model.num_feature() == 43
     assert bundle.stage1.category_levels == bundle.stage2.category_levels
     points, labels = bundle.grade_scale.convert([49, 60, 90], [1, 1, 1])
     assert points.tolist() == [0, 2, 4]
@@ -491,7 +491,7 @@ def test_runtime_load_needs_no_experiment_or_training_file_reads_or_imports(arti
         return original_import(name, *args, **kwargs)
     monkeypatch.setattr(Path, "open", guarded_open)
     monkeypatch.setattr(builtins, "__import__", guarded_import)
-    assert load(root).stage1.grade_model.num_feature() == 33
+    assert load(root).stage1.grade_model.num_feature() == 31
 
 
 @pytest.mark.parametrize("field,value", [("dataset_version", "V1"), ("feature_engineering_version", 1), ("manifest_version", 99)])

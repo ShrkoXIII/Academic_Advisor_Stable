@@ -2,7 +2,7 @@
 
 The local Core envelope is ``{delta_part, finalized: True, aggregates: [...]}``.
 Each row has degree/course/faculty/requirement IDs, full course_credits, count,
-fail_count, retake_count, mark_sum and attempt_sum. Counts describe finalized
+fail_count, retake_count and mark_sum. Counts describe finalized
 outcomes using the training definitions (mark < 50, attempt > 1), not roster
 statuses. An optional row part_id must equal delta_part. This is not an HTTP
 contract. No raw rows, training tables or experimental history are read here.
@@ -33,11 +33,11 @@ from src.features.temporal_features import (
 
 
 DELTA_ID_COLUMNS = ("degree_id", "course_id", "faculty_id", "plan_requirement_type_id")
-DELTA_NUMERIC_COLUMNS = ("course_credits", "count", "fail_count", "retake_count", "mark_sum", "attempt_sum")
+DELTA_NUMERIC_COLUMNS = ("course_credits", "count", "fail_count", "retake_count", "mark_sum")
 DELTA_COLUMNS = (*DELTA_ID_COLUMNS, *DELTA_NUMERIC_COLUMNS)
 _MAX_EXACT_INTEGER = 2**53
 _EXACT_SUM_SOURCES = {"effective_support": "count", "raw_count": "count", "fail_sum": "fail_count",
-                      "attempt_sum": "attempt_sum", "retake_sum": "retake_count"}
+                      "retake_sum": "retake_count"}
 
 
 def _number(value, name, *, integer=False):
@@ -96,7 +96,8 @@ def normalize_history_delta(payload, *, require_finalized=True):
         raise ValueError("History aggregates must be a list of records.")
     rows, seen = [], set()
     for record in records:
-        if not isinstance(record, Mapping) or not set(DELTA_COLUMNS).issubset(record):
+        if (not isinstance(record, Mapping) or not set(DELTA_COLUMNS).issubset(record)
+                or set(record) - {*DELTA_COLUMNS, "part_id"}):
             raise ValueError("History aggregate is missing required keys or sums.")
         if "part_id" in record and _part(record["part_id"]) != part:
             raise ValueError("Aggregate part_id must match delta_part.")
@@ -112,12 +113,11 @@ def normalize_history_delta(payload, *, require_finalized=True):
         numbers = {column: _number(record[column], column, integer=column != "course_credits" and column != "mark_sum")
                    for column in DELTA_NUMERIC_COLUMNS}
         count, failed, retakes = (numbers[c] for c in ("count", "fail_count", "retake_count"))
-        marks, attempts = numbers["mark_sum"], numbers["attempt_sum"]
+        marks = numbers["mark_sum"]
         if (count <= 0 or failed > count or retakes > count or marks > 100 * count
                 or marks < 50 * (count - failed)
-                or (failed > 0 and marks >= 50 * failed + 100 * (count - failed))
-                or attempts < count + retakes or (retakes == 0 and attempts != count)):
-            raise ValueError("Aggregate sums violate finalized mark/failure/attempt definitions.")
+                or (failed > 0 and marks >= 50 * failed + 100 * (count - failed))):
+            raise ValueError("Aggregate sums violate finalized mark/failure definitions.")
         if numbers["course_credits"] >= 2**63 - 1:
             raise ValueError("course_credits exceeds the history-key numeric range.")
         values = tuple(_canonical_number(numbers[c]) for c in DELTA_NUMERIC_COLUMNS)
@@ -127,7 +127,7 @@ def normalize_history_delta(payload, *, require_finalized=True):
         seen.add(grain)
         rows.append((*ids, *values))
     rows = tuple(sorted(rows))
-    canonical = json.dumps({"format_version": 1, "delta_part": part, "columns": DELTA_COLUMNS,
+    canonical = json.dumps({"format_version": 2, "delta_part": part, "columns": DELTA_COLUMNS,
                             "rows": rows}, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return HistoryDelta(part, rows, sha256(canonical.encode("utf-8")).hexdigest())
 
@@ -143,12 +143,11 @@ def validate_history_state(state):
     def check_sums(values):
         if not np.isfinite(values).all() or (values < 0).any():
             raise ValueError("History sums must be finite and nonnegative.")
-        support, count, mark, fail, attempt, retake = values.T
+        support, count, mark, fail, retake = values.T
         tolerance = 1e-8
         if (np.any(support > count + tolerance) or np.any(count != np.floor(count))
                 or np.any(fail > support + tolerance) or np.any(retake > support + tolerance)
                 or np.any(mark / np.maximum(support, 1e-300) > 100 + tolerance)
-                or np.any(attempt + tolerance < support)
                 or np.any((support == 0) & (np.sum(values, axis=1) != 0))):
             raise ValueError("Inconsistent history aggregates.")
 
@@ -195,7 +194,7 @@ def _apply_normalized_delta(state, delta):
         additions = pd.DataFrame({
             "effective_support": frame["count"], "raw_count": frame["count"],
             "mark_sum": frame["mark_sum"], "fail_sum": frame["fail_count"],
-            "attempt_sum": frame["attempt_sum"], "retake_sum": frame["retake_count"],
+            "retake_sum": frame["retake_count"],
         })
         for level, key in build_history_keys(frame).items():
             grouped = additions.assign(key=key).groupby("key", sort=True)[HISTORY_SUM_COLUMNS].sum()

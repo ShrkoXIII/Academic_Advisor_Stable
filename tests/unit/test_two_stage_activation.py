@@ -66,8 +66,8 @@ def test_verified_artifact_loader_accepts_complete_human_approval(artifact_root)
     promote(artifact_root)
     mutate_manifest(artifact_root, approve_manifest)
     bundle = load(artifact_root)
-    assert bundle.stage1.grade_model.num_feature() == 33
-    assert bundle.stage2.grade_model.num_feature() == 47
+    assert bundle.stage1.grade_model.num_feature() == 31
+    assert bundle.stage2.grade_model.num_feature() == 43
     assert bundle.manifest["ranking_policy"]["approved_combination"] == {
         "stage1_shortlist_strategy": {"name": "pareto", "version": "v1"},
         "final_ranking_strategy": {"name": "pareto", "version": "v1"},
@@ -150,8 +150,8 @@ def test_production_loads_once_then_is_deterministic_and_defends_approval_snapsh
     assert second["metadata"]["ranking_approval"]["combination"] == "APPROVED"
     assert first["recommendations"] == second["recommendations"]
     assert len(artifacts.stage1.grade_model.matrices) == 2
-    assert all(len(matrix) == 8 and len(matrix.columns) == 33 for matrix in artifacts.stage1.grade_model.matrices)
-    assert all(len(matrix) == 200 and len(matrix.columns) == 47 for matrix in artifacts.stage2.grade_model.matrices)
+    assert all(len(matrix) == 8 and len(matrix.columns) == 31 for matrix in artifacts.stage1.grade_model.matrices)
+    assert all(len(matrix) == 200 and len(matrix.columns) == 43 for matrix in artifacts.stage2.grade_model.matrices)
 
 
 def test_production_does_not_allow_replacing_an_approved_strategy(tmp_path, monkeypatch):

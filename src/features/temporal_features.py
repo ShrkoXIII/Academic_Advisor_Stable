@@ -9,7 +9,6 @@ import pandas as pd
 COURSE_HISTORY_COLUMNS = [
     "course_history_avg_mark",
     "course_history_fail_rate",
-    "course_history_avg_attempt",
     "course_history_retake_rate",
     "course_history_effective_support",
     "course_history_fallback_level",
@@ -21,13 +20,11 @@ PLAN_CONTEXT_COLUMNS = [
     "plan_total_credits",
     "plan_credit_weighted_fail_rate",
     "plan_credit_weighted_avg_mark",
-    "plan_credit_weighted_avg_attempt",
     "plan_difficulty_credit_load",
     "peer_course_count",
     "peer_total_credits",
     "peer_credit_weighted_fail_rate",
     "peer_credit_weighted_avg_mark",
-    "peer_credit_weighted_avg_attempt",
     "peer_difficulty_credit_load",
     "peer_max_fail_rate",
     "peer_difficulty_missing",
@@ -51,7 +48,6 @@ HISTORY_SUM_COLUMNS = [
     "raw_count",
     "mark_sum",
     "fail_sum",
-    "attempt_sum",
     "retake_sum",
 ]
 
@@ -125,7 +121,6 @@ class CourseHistoryState:
         base["raw_count"] = 1.0
         base["mark_sum"] = mark * weight
         base["fail_sum"] = mark.lt(50).astype("float64") * weight
-        base["attempt_sum"] = attempt * weight
         base["retake_sum"] = attempt.gt(1).astype("float64") * weight
 
         keys = build_history_keys(outcomes)
@@ -157,8 +152,6 @@ class CourseHistoryState:
                 / global_support,
                 "course_history_fail_rate": self.global_sums["fail_sum"]
                 / global_support,
-                "course_history_avg_attempt": self.global_sums["attempt_sum"]
-                / global_support,
                 "course_history_retake_rate": self.global_sums["retake_sum"]
                 / global_support,
             }
@@ -166,7 +159,6 @@ class CourseHistoryState:
             global_values = {
                 "course_history_avg_mark": np.nan,
                 "course_history_fail_rate": np.nan,
-                "course_history_avg_attempt": np.nan,
                 "course_history_retake_rate": np.nan,
             }
 
@@ -181,7 +173,6 @@ class CourseHistoryState:
         sum_column = {
             "course_history_avg_mark": "mark_sum",
             "course_history_fail_rate": "fail_sum",
-            "course_history_avg_attempt": "attempt_sum",
             "course_history_retake_rate": "retake_sum",
         }
         for level in range(5, 0, -1):
@@ -371,7 +362,6 @@ def compute_plan_context_features(roster, group_columns=None):## بدي احسب
     weighted_specs = {
         "fail_rate": "course_history_fail_rate",
         "avg_mark": "course_history_avg_mark",
-        "avg_attempt": "course_history_avg_attempt",
     }
     peer_outputs = {}
     for label, source_column in weighted_specs.items():

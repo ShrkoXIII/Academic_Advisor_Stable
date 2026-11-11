@@ -45,7 +45,7 @@ def training_signature():
 
 
 def prepare_course_folds(train):
-    """Keep official labels/weights/fold levels, selecting only 33 X columns."""
+    """Keep official labels/weights/fold levels, selecting only 31 X columns."""
     folds = official.prepare_folds(train)
     for fold in folds:
         for name in ["fit_X", "valid_X"]:
@@ -70,7 +70,7 @@ def train_experiment():
     prepared = prepare_course_folds(train)
     selections = {}
     for task in ["grade", "fail"]:
-        print(f"Starting 33-feature {task} validation: same three candidates / two folds", flush=True)
+        print(f"Starting 31-feature {task} validation: same three candidates / two folds", flush=True)
         best, reports = official.tune_model(prepared, task)
         selections[task] = best
         write_json(COURSE_ONLY_EVALUATION_DIR / f"{task}_validation.json", {"best": best, "all_candidates": reports})
@@ -81,7 +81,7 @@ def train_experiment():
         "experiment": "course_only_recommendation", "dataset_version": "V2",
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "feature_engineering_version": FEATURE_ENGINEERING_VERSION,
-        "feature_contract": {"model_features": COURSE_ONLY_FEATURES, "feature_count": 33,
+        "feature_contract": {"model_features": COURSE_ONLY_FEATURES, "feature_count": 31,
                              "removed_features": sorted(REMOVED_CONTEXT_FEATURES)},
         "training_as_of_part": int(train.part_id.max()), "train_rows": len(train), "test_rows": len(test),
         "temporal_folds": official.TEMPORAL_FOLDS,
@@ -103,7 +103,7 @@ def train_experiment():
         y = pd.to_numeric(train[target]).to_numpy(dtype="float64" if task == "grade" else "int64")
         model = official.train_one(train_x, y, weight, params, num_boost_round=max(1, selected["mean_best_iteration"]))
         if model.feature_name() != COURSE_ONLY_FEATURES:
-            raise ValueError("Fitted model does not match the ordered 33-feature contract.")
+            raise ValueError("Fitted model does not match the ordered 31-feature contract.")
         model.save_model(str(COURSE_ONLY_MODEL_DIR / model_path))
         maximum = 100 if task == "grade" else 1
         experimental = np.clip(model.predict(test_x, num_threads=4), 0, maximum)
@@ -115,8 +115,8 @@ def train_experiment():
                           "official_cv_mean_saved": baseline_metadata[section]["selected_candidate"]["mean_primary_metric"],
                           "official_cv_provenance": "saved official metadata; not retrained in this experiment",
                           "feature_importance": official.feature_importance(model)}
-        predictions[f"{task}_prediction_33"] = experimental
-        predictions[f"{task}_prediction_47"] = baseline
+        predictions[f"{task}_prediction_31"] = experimental
+        predictions[f"{task}_prediction_43"] = baseline
         print(task, metadata[task]["experimental_test_metrics"], flush=True)
     save_category_levels(levels, COURSE_ONLY_MODEL_DIR / "category_levels.json")
     metadata["training_seconds"] = perf_counter() - started
@@ -138,7 +138,7 @@ def load_experiment():
     grade = lgb.Booster(model_file=str(COURSE_ONLY_MODEL_DIR / "grade_regressor.txt"))
     fail = lgb.Booster(model_file=str(COURSE_ONLY_MODEL_DIR / "fail_risk_classifier.txt"))
     if grade.feature_name() != COURSE_ONLY_FEATURES or fail.feature_name() != COURSE_ONLY_FEATURES:
-        raise ValueError("Experimental model headers must contain exactly the ordered 33 features.")
+        raise ValueError("Experimental model headers must contain exactly the ordered 31 features.")
     return grade, fail, load_category_levels(COURSE_ONLY_MODEL_DIR / "category_levels.json"), metadata
 
 

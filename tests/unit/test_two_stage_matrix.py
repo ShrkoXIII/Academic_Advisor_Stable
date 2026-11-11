@@ -16,8 +16,8 @@ from src.features.feature_contract import (
 from src.recommendation.two_stage_artifacts import stage_feature_contract
 
 
-def _legacy_47_matrix(frame, category_levels):
-    """Frozen pre-generalization implementation, used only as a parity oracle."""
+def _ordered_matrix(frame, category_levels):
+    """Feature-contract ordered matrix used as a coercion parity oracle."""
     matrix = pd.DataFrame(index=frame.index)
     for column in NUMERIC_FEATURES:
         matrix[column] = pd.to_numeric(frame[column], errors="coerce").astype(
@@ -45,13 +45,13 @@ def _matrix_inputs(empty=False):
 
 
 @pytest.mark.parametrize("empty", [False, True])
-def test_default_matrix_matches_legacy_47_exactly_without_mutating_inputs(empty):
+def test_default_matrix_matches_contract_order_exactly_without_mutating_inputs(empty):
     frame, levels = _matrix_inputs(empty)
     original_frame, original_levels = frame.copy(deep=True), deepcopy(levels)
 
     actual = prepare_model_matrix(frame, levels)
 
-    pd.testing.assert_frame_equal(actual, _legacy_47_matrix(frame, levels), check_exact=True)
+    pd.testing.assert_frame_equal(actual, _ordered_matrix(frame, levels), check_exact=True)
     pd.testing.assert_frame_equal(frame, original_frame, check_exact=True)
     assert levels == original_levels
 
@@ -66,7 +66,7 @@ def test_stage1_matches_legacy_slice_without_requiring_plan_context(empty):
     actual = prepare_model_matrix(course_rows, levels, model_features=features)
 
     pd.testing.assert_frame_equal(
-        actual, _legacy_47_matrix(frame, levels).loc[:, features], check_exact=True,
+        actual, _ordered_matrix(frame, levels).loc[:, features], check_exact=True,
     )
     pd.testing.assert_frame_equal(course_rows, original_rows, check_exact=True)
     assert levels == original_levels
@@ -123,7 +123,7 @@ def test_explicit_features_reject_duplicate_model_columns(feature):
         prepare_model_matrix(frame, levels, model_features=[feature, feature])
 
 
-def test_legacy_course_matrix_api_retains_33_feature_coercion_and_missing_validation():
+def test_course_matrix_api_retains_31_feature_coercion_and_missing_validation():
     from src.modeling.shortlist_features import COURSE_ONLY_FEATURES, prepare_course_matrix
 
     frame, levels = _matrix_inputs()
@@ -131,7 +131,7 @@ def test_legacy_course_matrix_api_retains_33_feature_coercion_and_missing_valida
 
     pd.testing.assert_frame_equal(
         prepare_course_matrix(course_rows, levels),
-        _legacy_47_matrix(frame, levels).loc[:, COURSE_ONLY_FEATURES],
+        _ordered_matrix(frame, levels).loc[:, COURSE_ONLY_FEATURES],
         check_exact=True,
     )
     with pytest.raises(ValueError, match="Missing course-only features"):

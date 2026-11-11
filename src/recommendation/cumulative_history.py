@@ -295,12 +295,14 @@ class CumulativeHistoryStore:
                 try:
                     existing = self._load(BASELINE_PART)
                     actual = existing.metadata
-                    generated = {"created_at", "created_at_utc", "new_history_sha256", "directory", "metadata_sha256", "cleanup_warnings"}
+                    generated = {"created_at", "created_at_utc", "new_history_sha256", "directory",
+                                "metadata_sha256", "cleanup_warnings", "artifact_sha256"}
                     expected = {key: value for key, value in exported.items() if key not in generated}
                     if {key: value for key, value in actual.items() if key not in generated} != expected:
                         raise ValueError("Baseline approval or source provenance differs.")
-                    if (actual["artifact_sha256"]["course_history_state.pkl"] != original_hash
-                            or actual.get("new_history_sha256") != original_hash
+                    if (actual["baseline_source_history_sha256"] != original_hash
+                            or actual["artifact_sha256"]["course_history_state.pkl"]
+                            != actual.get("new_history_sha256")
                             or existing._state.global_sums != state.global_sums):
                         raise ValueError("Baseline history differs.")
                     for level in state.tables:
@@ -310,16 +312,18 @@ class CumulativeHistoryStore:
                 loaded, provenance = existing._state, actual
             else:
                 loaded, provenance = save_frozen_history_atomic(state, exported, root=self.root)
-            if provenance["artifact_sha256"]["course_history_state.pkl"] != original_hash:
-                raise HistoryUpdateError("HISTORY_CONFLICT", "Migrated baseline bytes differ from approved source.")
+            new_hash = provenance["artifact_sha256"]["course_history_state.pkl"]
+            if provenance.get("new_history_sha256") != new_hash:
+                raise HistoryUpdateError("HISTORY_CONFLICT", "Migrated baseline artifact hash is inconsistent.")
             self._compatible(HistorySnapshot(loaded, provenance))
-            control["active"] = {"as_of_part": BASELINE_PART, "history_sha256": original_hash}
-            control.setdefault("activated_versions", {})[str(BASELINE_PART)] = original_hash
+            control["active"] = {"as_of_part": BASELINE_PART, "history_sha256": new_hash}
+            control.setdefault("activated_versions", {})[str(BASELINE_PART)] = new_hash
             control["last_successful_update"] = {"operation": "initialize", "as_of_part": BASELINE_PART,
-                "history_sha256": original_hash, "source_metadata_sha256": expected_source_hash,
+                "history_sha256": new_hash, "source_metadata_sha256": expected_source_hash,
+                "source_history_sha256": original_hash,
                 "approval_sha256": approval_hash, "at_utc": _now(), "completeness": "admin_attested"}
         return {"status": "initialized", "active_as_of_part": BASELINE_PART,
-                "history_as_of_part": BASELINE_PART, "new_history_sha256": original_hash,
+                "history_as_of_part": BASELINE_PART, "new_history_sha256": new_hash,
                 "source_metadata_sha256": expected_source_hash, "source_history_sha256": original_hash,
                 "baseline_completeness": "admin_attested", "baseline_recovered": recovered}
 

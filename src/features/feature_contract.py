@@ -3,14 +3,14 @@ import json
 import pandas as pd
 
 
-FEATURE_ENGINEERING_VERSION = 2
+FEATURE_ENGINEERING_VERSION = 3
 
 
 def require_current_features(metadata):
     if metadata.get("feature_engineering_version") != FEATURE_ENGINEERING_VERSION:
         raise ValueError(
             "Stale feature engineering: rebuild temporal features, retrain models, "
-            "then rerun evaluation. Artifacts from before the leakage fix cannot be used."
+            "then rerun evaluation. Artifacts from an older feature contract cannot be used."
         )
 
 
@@ -18,7 +18,6 @@ CATEGORY_MISSING = "__MISSING__"
 CATEGORY_UNKNOWN = "__UNKNOWN__"
 
 CATEGORICAL_FEATURES = [
-    "plan_course_type_id",
     "plan_requirement_type_id",
     "diploma_type_id",
     "grade_version_id",
@@ -53,7 +52,6 @@ NUMERIC_FEATURES = [
     # Course difficulty learned strictly from earlier semesters.
     "course_history_avg_mark",
     "course_history_fail_rate",
-    "course_history_avg_attempt",
     "course_history_retake_rate",
     "course_history_effective_support",
     "course_history_fallback_level",
@@ -65,7 +63,6 @@ NUMERIC_FEATURES = [
 
     "plan_credit_weighted_fail_rate",     # متوسط نسبة الرسوب التاريخية لكل مواد الفصل، موزون بعدد الساعات
     "plan_credit_weighted_avg_mark",       # متوسط العلامة التاريخية لكل مواد الفصل، موزون بعدد الساعات
-    "plan_credit_weighted_avg_attempt",    # متوسط عدد المحاولات التاريخي لكل مواد الفصل، موزون بعدد الساعات
     "plan_difficulty_credit_load",         # حمل صعوبة الفصل الكلي = مجموع (نسبة الرسوب التاريخية × ساعات المادة)
 
     "peer_course_count",                  # عدد المواد الأخرى في الفصل باستثناء المادة الحالية
@@ -73,7 +70,6 @@ NUMERIC_FEATURES = [
 
     "peer_credit_weighted_fail_rate",      # متوسط نسبة الرسوب التاريخية للمواد الأخرى فقط، موزون بالساعات
     "peer_credit_weighted_avg_mark",       # متوسط العلامة التاريخية للمواد الأخرى فقط، موزون بالساعات
-    "peer_credit_weighted_avg_attempt",    # متوسط عدد المحاولات التاريخي للمواد الأخرى فقط، موزون بالساعات
     "peer_difficulty_credit_load",         # حمل صعوبة المواد الأخرى = مجموع (نسبة الرسوب × الساعات) بدون المادة الحالية
 
     "peer_max_fail_rate",                 # أعلى نسبة رسوب تاريخية بين المواد الأخرى في نفس الفصل
@@ -136,7 +132,7 @@ def learn_category_levels(frame):
 
 
 def prepare_model_matrix(frame, category_levels, *, model_features=None):
-    """Coerce an ordered model-feature subset, defaulting to the official 47."""
+    """Coerce an ordered model-feature subset, defaulting to the official 43."""
     features = BASE_FEATURES if model_features is None else list(model_features)
     selected = set(features)
     if len(selected) != len(features):

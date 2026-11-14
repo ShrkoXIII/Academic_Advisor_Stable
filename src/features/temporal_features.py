@@ -420,7 +420,6 @@ def compute_plan_context_features(roster, group_columns=None):## بدي احسب
 def save_course_history_state(state, path):
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
-        "format_version": 2,
         "as_of_part": state.as_of_part,
         "smoothing_k": state.smoothing_k,
         "min_support": state.min_support,
@@ -434,8 +433,8 @@ def save_course_history_state(state, path):
 def load_course_history_state(path):
     with path.open("rb") as stream:
         payload = pickle.load(stream)
-    if payload.get("format_version") != 2:
-        raise ValueError("Rebuild temporal features: saved history has no cutoff.")
+    if not {"as_of_part", "smoothing_k", "min_support", "tables", "global_sums"}.issubset(payload):
+        raise ValueError("Rebuild temporal features: saved history is incomplete.")
     return CourseHistoryState(
         smoothing_k=payload["smoothing_k"],
         min_support=payload["min_support"],

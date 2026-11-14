@@ -23,7 +23,6 @@ import pandas as pd
 
 from src import paths
 from src.data.cleaning.cleaning_utils import clean_id
-from src.features.feature_contract import FEATURE_ENGINEERING_VERSION
 from src.features.frozen_history import (
     load_frozen_history, save_frozen_history_atomic, validate_history_selection,
 )
@@ -69,7 +68,7 @@ def _canonical_number(number):
 
 @dataclass(frozen=True)
 class HistoryDelta:
-    """Normalized immutable rows with a canonical, versioned content identity."""
+    """Normalized immutable rows with a canonical content identity."""
 
     delta_part: int
     rows: tuple
@@ -127,7 +126,7 @@ def normalize_history_delta(payload, *, require_finalized=True):
         seen.add(grain)
         rows.append((*ids, *values))
     rows = tuple(sorted(rows))
-    canonical = json.dumps({"format_version": 2, "delta_part": part, "columns": DELTA_COLUMNS,
+    canonical = json.dumps({"delta_part": part, "columns": DELTA_COLUMNS,
                             "rows": rows}, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return HistoryDelta(part, rows, sha256(canonical.encode("utf-8")).hexdigest())
 
@@ -278,7 +277,7 @@ class FrozenHistoryManager:
 
     @classmethod
     def load(cls, *, root=None):
-        """Load the newest valid, complete, base-only V2 bundle without rebuild."""
+        """Load the newest valid, complete, base-only bundle without rebuild."""
         root = Path(paths.FROZEN_HISTORY_DIR if root is None else root)
         candidates = []
         for directory in root.glob("as_of_*"):
@@ -290,14 +289,14 @@ class FrozenHistoryManager:
         skipped = []
         for cutoff, directory in sorted(candidates, reverse=True):
             try:
-                state, _, metadata = load_frozen_history(cutoff, root=root, dataset_version="V2")
+                state, _, metadata = load_frozen_history(cutoff, root=root)
                 validate_history_state(state)
                 _validate_update_metadata(metadata)
             except (OSError, ValueError, KeyError, TypeError, AttributeError, EOFError, pickle.UnpicklingError) as exc:
                 skipped.append({"as_of_part": cutoff, "reason": str(exc)})
                 continue
             return cls(HistorySnapshot(state, metadata), root=root, skipped_bundles=skipped)
-        raise FileNotFoundError(f"No complete valid V2 Frozen History found in {root}.")
+        raise FileNotFoundError(f"No complete valid Frozen History found in {root}.")
 
     def capture(self, *, target_part, history_as_of_part=None, allow_older_history=None):
         """Pin one snapshot, accepting stale finalized history and forbidding overlap."""
@@ -309,7 +308,7 @@ class FrozenHistoryManager:
             with self._active_lock:
                 snapshot = self._snapshots.get(cutoff)
             if snapshot is None:
-                state, _, metadata = load_frozen_history(cutoff, root=self.root, dataset_version="V2")
+                state, _, metadata = load_frozen_history(cutoff, root=self.root)
                 validate_history_state(state)
                 _validate_update_metadata(metadata)
                 snapshot = HistorySnapshot(state, metadata)
@@ -362,7 +361,6 @@ class FrozenHistoryManager:
             part_counts = dict(old_meta.get("source_part_counts", {}))
             part_counts[str(delta.delta_part)] = sum(int(row[5]) for row in delta.rows)
             metadata = {
-                "dataset_version": "V2", "feature_engineering_version": FEATURE_ENGINEERING_VERSION,
                 "source_min_part": old_meta.get("source_min_part", previous.as_of_part),
                 "source_max_part": delta.delta_part, "finalized_through_part": delta.delta_part,
                 "source_row_count": int(state.global_sums["raw_count"]), "source_part_counts": part_counts,

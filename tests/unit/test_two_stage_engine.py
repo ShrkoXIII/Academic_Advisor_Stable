@@ -298,7 +298,6 @@ def test_result_provenance_has_model_category_scale_history_and_input_hashes(tmp
         assert entry["category_levels"]["sha256"] == "3" * 64
         assert entry["feature_contract"]["feature_count"] == (31 if stage == "stage1" else 43)
     assert metadata["grade_scale_sha256"] == "4" * 64
-    assert metadata["grade_scale_version"] == "sha256:" + "4" * 64
     assert len(metadata["history"]["artifact_sha256"]["course_history_state.pkl"]) == 64
     assert len(metadata["input_sha256"]) == 64
     assert metadata["ranking_approval"] == {

@@ -39,9 +39,9 @@
 - الملفات: `docs/CHANGELOG.md`، `Agents.md` (ملف تعليمات الجذر الموجود).
 
 ## 2026-11-04 — Canonical Data Cleaning Path Names
-- إزالة أسماء المسارات المحلية ذات لاحقة V2 من وحدات التنظيف الخمس واعتماد ثوابت `src/paths.py` مباشرة، دون تغيير المسارات أو منطق التنظيف.
+- إزالة أسماء المسارات المحلية القديمة من وحدات التنظيف الخمس واعتماد ثوابت `src/paths.py` مباشرة، دون تغيير المسارات أو منطق التنظيف.
 - تحديث `monkeypatch` في ملفات الاختبارات الخمسة المقابلة ووصف `src/paths.py`؛ لم يحتج التقويم إلى تعديل ولم تُعد بناء البيانات.
-- التحقق: نجح 203 اختبارات مركزة ثم جميع اختبارات `tests/unit` وعددها 249؛ لا توجد أسماء V1/V2 في نطاق التنظيف والتقويم والاختبارات.
+- التحقق: نجح 203 اختبارات مركزة ثم جميع اختبارات `tests/unit` وعددها 249؛ أزيلت أسماء المسارات القديمة من نطاق التنظيف والتقويم والاختبارات.
 
 ## 2026-11-05 — Data Building Migration and Raw Rebuild
 - نقل وحدات common-student/enrichment/temporal split/registration roster واختباراتها إلى `src/data/building/` و`tests/unit/` دون تغيير المنطق؛ تطابقت AST بعد تطبيع الاستيرادات والمسارات.
@@ -104,13 +104,19 @@
 - تحديث `README.md` و`docs/CHANGELOG.md` بنتيجة PASS WITH WARNINGS؛ الاتصال الفعلي بالجامعة والفحص البصري عبر IAB غير متحققين، بينما نجحت اختبارات HTTP وStreamlit AppTest؛ لا commit أو merge.
 
 ## 2026-11-07 — Canonical Pipeline Labels and History Source Paths
-- Removed runner dataset labels/mixed-version handling and the custom-history `_v2` filename requirement; preserved CLI order, serialized contracts, cutoffs, and academic/null/diploma behavior.
+- Removed runner dataset labels and mixed dataset handling; custom history no longer requires a specially suffixed filename. Preserved CLI order, serialized contracts, cutoffs, and academic/null/diploma behavior.
 - Clarified canonical paths, branches, and staging labels in `src/{main,paths}.py`, `src/data/building/filter_common_students.py`, `src/features/{build_frozen_history,frozen_history}.py`, `src/modeling/build_artifact_manifest.py`, `src/recommendation/two_stage_artifacts.py`, and `README.md`.
 - Updated `tests/unit/test_{main_runner,frozen_history,filter_common_students}.py`: 28 focused and 837 relevant unit tests passed; 67 source imports/compilation, 49 unique paths, dependency connections, and CLI checks passed without executing pipeline stages or training.
 - Preserved data/models/manifests and all 11 shortlist input/source hashes; the build manifest retains historical source fingerprints for five edited files. No datasets, history, models, or evaluation artifacts were rebuilt, overwritten, published, or deleted.
 
 ## 2026-11-11 — Remove Average-Attempt Features
-- Removed `plan_course_type_id` and all average-attempt model signals; contracts now expose 31 Stage 1 and 43 Stage 2 features (feature version 3).
+- Removed `plan_course_type_id` and all average-attempt model signals; contracts now expose 31 Stage 1 and 43 Stage 2 features.
 - Removed `attempt_sum` from frozen history and finalized delta rows; retained `attempt_number`, retake-rate features, and `retake_sum`; updated `src/features/`, `src/modeling/`, `src/recommendation/`, and `src/api/`.
 - Updated cumulative baseline provenance to distinguish source and newly serialized history hashes; documented the new model contract in `docs/api_contract.md`.
 - Validation: 193 focused tests passed; full unit collection is blocked by missing `pydantic`. Models were not retrained and data/history artifacts were not rebuilt.
+
+## 2026-11-12 — توحيد عقد الميزات والتاريخ
+- أزيلت أرقام عقد الميزات والتاريخ من الكود والـmetadata المحفوظة؛ نُظفت خصائص Parquet وحزم Frozen History دون إعادة تدريب أو تغيير صفوفها.
+- السبب: تثبيت مسار واحد نهائي للتاريخ والتدريب دون تسميات عقد رقمية.
+- التحقق: لم تُشغّل الاختبارات أو مراحل البيانات ضمن هذا التعديل.
+- الملفات: `src/features/`، `src/modeling/`، `src/recommendation/`، `src/api/service.py`، `src/evaluation/`، `models/`، `data/features/`، `data/artifacts/`، `tests/unit/`، `README.md`.

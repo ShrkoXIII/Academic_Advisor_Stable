@@ -9,7 +9,7 @@ from pathlib import Path
 
 from src.features.feature_contract import (
     BASE_FEATURES, CATEGORICAL_FEATURES, CATEGORY_MISSING, CATEGORY_UNKNOWN,
-    FEATURE_ENGINEERING_VERSION, NUMERIC_FEATURES, require_current_features,
+    NUMERIC_FEATURES,
 )
 from src.features.frozen_history import file_sha256
 from src.features.temporal_features import PLAN_CONTEXT_COLUMNS
@@ -18,7 +18,6 @@ from src import paths
 from .ranking_policy import UNAPPROVED_RANKING, validate_ranking_policy
 
 
-MANIFEST_VERSION = 1
 PREDICTION_CONTRACT = {
     "grade": {"clip": [0, 100], "expected_points_method": "predicted_mark_to_grade_scale"},
     "fail": {"clip": [0, 1]}, "reject_non_finite": True, "reject_wrong_shape": True,
@@ -105,9 +104,6 @@ def verify_artifact_hash(path, expected):
 
 def validate_stage_metadata(stage, metadata):
     """Validate original evidence without changing or normalizing that evidence."""
-    require_current_features(metadata)
-    if metadata.get("dataset_version", "V2" if stage == "stage2" else None) != "V2":
-        raise ValueError(f"{stage} metadata must identify V2.")
     expected = stage_feature_contract(stage)
     recorded = metadata.get("feature_contract", {})
     checked = ("model_features", "feature_count", "removed_features") if stage == "stage1" else expected
@@ -122,7 +118,7 @@ def validate_stage_metadata(stage, metadata):
         if metadata.get("targets") != {
             "grade_regressor": "final_mark", "fail_risk_classifier": "(final_mark < 50).astype(int)",
         }:
-            raise ValueError("Official V2 target definitions mismatch.")
+            raise ValueError("Official target definitions mismatch.")
         expected_paths = artifact_relative_paths(stage)
         expected_metadata_paths = {
             "grade_model": expected_paths["grade"], "fail_model": expected_paths["fail"],
@@ -130,13 +126,13 @@ def validate_stage_metadata(stage, metadata):
             "model_metadata": paths.MODEL_METADATA_PATH.relative_to(paths.PROJECT_ROOT).as_posix(),
         }
         if metadata.get("artifacts") != expected_metadata_paths:
-            raise ValueError("Official V2 metadata artifact paths mismatch.")
+            raise ValueError("Official metadata artifact paths mismatch.")
         for section in sections:
             selected = metadata[section]["selected_candidate"]
             candidates = metadata[section].get("all_candidates", [])
             if (not candidates or selected not in candidates
                     or selected != min(candidates, key=lambda item: item["mean_primary_metric"])):
-                raise ValueError("Official V2 selected candidate mismatch.")
+                raise ValueError("Official selected candidate mismatch.")
         cutoff = metadata["course_history"]["initial_history_cutoff"]
         basis = "original_metadata.course_history.initial_history_cutoff"
     for section, objective in zip(sections, ("regression", "binary")):
@@ -184,7 +180,7 @@ def validate_archived_provenance(stage, evidence):
             or relative.name not in {"model_metadata.json", paths.MODEL_METADATA_PATH.name}
             or not _is_sha256(evidence["metadata_sha256"])):
         raise ValueError("Original metadata path/hash provenance is incomplete.")
-    for field in ("dataset_version_basis", "target_basis"):
+    for field in ("source_basis", "target_basis"):
         if not isinstance(evidence[field], str) or not evidence[field]:
             raise ValueError(f"Missing original provenance basis: {field}")
     source_evidence = evidence["source_evidence_sha256_at_promotion"]
@@ -209,9 +205,9 @@ def validate_archived_provenance(stage, evidence):
 
 def validate_artifact_manifest(manifest):
     """Validate the deployment contract; this does not approve ranking activation."""
-    if (manifest["manifest_version"] != MANIFEST_VERSION or manifest["dataset_version"] != "V2"
-            or manifest["feature_engineering_version"] != FEATURE_ENGINEERING_VERSION):
-        raise ValueError("Incompatible two-stage manifest version.")
+    required = {"stages", "grade_scale", "prediction_contract", "ranking_approval", "ranking_policy"}
+    if not required.issubset(manifest):
+        raise ValueError("Incomplete two-stage manifest contract.")
     if manifest["prediction_contract"] != PREDICTION_CONTRACT:
         raise ValueError("Prediction processing contract mismatch.")
     validate_ranking_policy(manifest)
@@ -234,8 +230,8 @@ def validate_artifact_manifest(manifest):
                 raise ValueError(f"{stage} {role} model path/target/objective mismatch.")
     scale = manifest["grade_scale"]
     if (scale["path"] != paths.GRADE_SCALE_PATH.relative_to(paths.PROJECT_ROOT).as_posix()
-            or scale["grade_scale_version"] != f"sha256:{scale['grade_scale_sha256']}"):
-        raise ValueError("GradeScale path/content version mismatch.")
+            or not _is_sha256(scale["grade_scale_sha256"])):
+        raise ValueError("GradeScale path/content identity mismatch.")
 
 
 def load_manifest_assets(manifest, *, project_root, shortlist_directory=None, target_part=None):
@@ -266,11 +262,14 @@ def load_manifest_assets(manifest, *, project_root, shortlist_directory=None, ta
         else:
             relative_metadata = paths.MODEL_METADATA_PATH.relative_to(paths.PROJECT_ROOT).as_posix()
             if evidence["metadata_path"] != relative_metadata:
-                raise ValueError("Official V2 metadata path mismatch.")
+                raise ValueError("Official metadata path mismatch.")
             metadata_path = project_file(project_root, relative_metadata)
             verify_artifact_hash(metadata_path, evidence["metadata_sha256"])
-            if read_artifact_json(metadata_path) != evidence["metadata"]:
-                raise ValueError("Official V2 metadata disagrees with archived evidence.")
+            current_metadata = read_artifact_json(metadata_path)
+            for obsolete_field in ("dataset_version", "feature_engineering_version", "format_version"):
+                current_metadata.pop(obsolete_field, None)
+            if current_metadata != evidence["metadata"]:
+                raise ValueError("Official metadata disagrees with archived evidence.")
     scale = manifest["grade_scale"]
     scale_path = project_file(project_root, scale["path"])
     verify_artifact_hash(scale_path, scale["grade_scale_sha256"])

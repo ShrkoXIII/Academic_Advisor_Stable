@@ -1,4 +1,4 @@
-"""Publish version-compatible assets byte-for-byte; never train or regenerate.
+"""Publish contract-compatible assets byte-for-byte; never train or regenerate.
 
 Run once from the repository root with:
     ./.venv/Scripts/python.exe -m src.modeling.build_artifact_manifest
@@ -19,7 +19,7 @@ from src.recommendation.ranking_policy import (
     balance_policy_contract, validate_ranking_policy,
 )
 from src.recommendation.two_stage_artifacts import (
-    MANIFEST_VERSION, PREDICTION_CONTRACT, UNAPPROVED_RANKING,
+    PREDICTION_CONTRACT, UNAPPROVED_RANKING,
     artifact_relative_paths, load_manifest_assets, project_file, read_artifact_json,
     stage_feature_contract, validate_stage_metadata, verify_artifact_hash,
 )
@@ -100,8 +100,12 @@ def build_promotion_manifest(project_root):
         models["fail"]["target_definition"] = "final_mark < 50"
         provenance = {
             "metadata_path": metadata_path.relative_to(root).as_posix(),
-            "metadata_sha256": file_sha256(metadata_path), "metadata": deepcopy(metadata),
-            "dataset_version_basis": "original_metadata.dataset_version" if stage == "stage1" else "official_V2_paths_and_verified_training_source",
+            "metadata_sha256": file_sha256(metadata_path),
+            "metadata": {
+                key: deepcopy(value) for key, value in metadata.items()
+                if key not in {"dataset_version", "feature_engineering_version", "format_version"}
+            },
+            "source_basis": "verified_training_signature_and_canonical_artifact_paths",
             "target_basis": "verified_training_config_and_fail_definition_source_and_binary_objectives",
             "source_evidence_sha256_at_promotion": source_evidence.copy(),
         }
@@ -121,10 +125,8 @@ def build_promotion_manifest(project_root):
     scale_relative = paths.GRADE_SCALE_PATH.relative_to(paths.PROJECT_ROOT).as_posix()
     scale_hash = file_sha256(project_file(root, scale_relative))
     return {
-        "manifest_version": MANIFEST_VERSION, "dataset_version": "V2",
-        "feature_engineering_version": source["feature_engineering_version"], "stages": stages,
-        "grade_scale": {"path": scale_relative, "grade_scale_version": f"sha256:{scale_hash}",
-                        "grade_scale_sha256": scale_hash},
+        "stages": stages,
+        "grade_scale": {"path": scale_relative, "grade_scale_sha256": scale_hash},
         "prediction_contract": deepcopy(PREDICTION_CONTRACT), "ranking_approval": UNAPPROVED_RANKING.copy(),
     }
 

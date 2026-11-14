@@ -2,7 +2,7 @@
 
 The caller attests which outcomes are finalized. Each base bundle contains
 course history and a metadata completion marker. A failed build leaves an incomplete,
-unloadable directory; neither complete nor incomplete versions are overwritten.
+unloadable directory; neither complete nor incomplete bundles are overwritten.
 Experimental specialty history is optional: its implementation must be supplied
 explicitly by the caller, never imported by the Features layer.
 Only load locally trusted pickle artifacts.
@@ -19,7 +19,6 @@ import pandas as pd
 from pandas.testing import assert_frame_equal
 
 from src import paths
-from src.features.feature_contract import FEATURE_ENGINEERING_VERSION, require_current_features
 from src.paths import (
     academic_part, course_history_state_path, frozen_history_dir,
     history_metadata_path, specialty_history_state_path,
@@ -68,27 +67,16 @@ def validate_history_pair(course, specialty, as_of_part):
         raise ValueError("Course and specialty history cutoffs must match the requested as_of_part.")
 
 
-def build_frozen_history(outcomes, as_of_part, *, finalized_through_part, specialty_history_type=None,
-                         dataset_version=None):
+def build_frozen_history(outcomes, as_of_part, *, finalized_through_part, specialty_history_type=None):
     """Return (course, optional specialty, metadata) from one finalized prefix.
 
     Base history needs no experimental features or points/failure labels.
-    Legacy experimental callers may supply their history type explicitly; it
-    must implement from_training(source) and use the same finalized cutoff.
-    V2 callers must attest versioned source provenance in outcomes.attrs; their
-    bundles contain only base course history.
+    Experimental callers may supply their history type explicitly; it must
+    implement from_training(source) and use the same finalized cutoff.
     """
-    if dataset_version not in (None, "V2"):
-        raise ValueError("Unsupported frozen history dataset_version; expected V2 or None.")
-    if dataset_version == "V2":
-        if outcomes.attrs.get("dataset_version") != "V2":
-            raise ValueError("V2 history sources must attest dataset_version=V2.")
-        if specialty_history_type is not None:
-            raise ValueError("Official V2 history cannot contain specialty history.")
     cutoff, finalized = academic_part(as_of_part), academic_part(finalized_through_part)
     if cutoff > finalized:
         raise ValueError("History cutoff exceeds finalized_through_part.")
-    require_current_features(outcomes.attrs)
     source_columns = list(HISTORY_SOURCE_COLUMNS)
     if specialty_history_type is not None:
         source_columns.extend(["is_fail", "points"])
@@ -139,8 +127,6 @@ def build_frozen_history(outcomes, as_of_part, *, finalized_through_part, specia
         "source_part_counts": {str(int(k)): int(v) for k, v in source.groupby("part_id").size().items()},
         "selected_source_sha256": sha256(pd.util.hash_pandas_object(fingerprint_source, index=False).values.tobytes()).hexdigest(),
     }
-    if dataset_version is not None:
-        metadata["dataset_version"] = dataset_version
     return course, specialty, metadata
 
 
@@ -160,12 +146,7 @@ def verify_legacy_course_history(legacy_path, rebuilt):
 
 
 def save_frozen_history(course, specialty, metadata, *, root=None):
-    if metadata.get("dataset_version") == "V2":
-        if specialty is not None:
-            raise ValueError("Official V2 history cannot contain specialty history.")
-        if root is None:
-            root = paths.FROZEN_HISTORY_DIR
-    cutoff = academic_part(course.as_of_part)
+    cutoff = academic_part(course.as_of_part)   
     validate_history_pair(course, specialty, cutoff)
     if metadata.get("source_max_part") != cutoff:
         raise ValueError("Metadata source_max_part must match the history cutoff.")
@@ -183,15 +164,17 @@ def save_frozen_history(course, specialty, metadata, *, root=None):
     if specialty is not None:
         with specialty_path.open("xb") as stream:
             pickle.dump({
-                "format_version": 1, "as_of_part": cutoff,
+                "as_of_part": cutoff,
                 "global_totals": specialty.global_totals, "degree_totals": specialty.degree_totals,
                 "requirement_totals": specialty.requirement_totals,
             }, stream)
         artifact_paths.append(specialty_path)
     payload = {
-        **metadata, "format_version": 2, "as_of_part": cutoff,
+        **{key: value for key, value in metadata.items()
+           if key not in {"dataset_version", "format_version", "feature_engineering_version",
+                          "feature_contract_sha256"}},
+        "as_of_part": cutoff,
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
-        "feature_engineering_version": FEATURE_ENGINEERING_VERSION,
         "history_type": "frozen_serving_history",
         "artifact_sha256": {p.name: file_sha256(p) for p in artifact_paths},
     }
@@ -200,40 +183,25 @@ def save_frozen_history(course, specialty, metadata, *, root=None):
     return payload
 
 
-def load_frozen_history(as_of_part, *, root=None, specialty_history_type=None, dataset_version=None):
+def load_frozen_history(as_of_part, *, root=None, specialty_history_type=None):
     """Load base history without Experiments, including from legacy bundles.
 
     The optional specialty result is None unless its type is supplied. Legacy
     specialty files still undergo hash and cutoff checks when present; callers
     requesting specialty history must provide a type accepting its saved fields.
-    Requesting dataset_version=V2 uses the canonical history root by default and
-    validates the serialized contract, rejecting specialty artifacts before opening them.
+    Loads the single canonical serialized history contract.
     """
-    if dataset_version not in (None, "V2"):
-        raise ValueError("Unsupported frozen history dataset_version; expected V2 or None.")
-    if dataset_version == "V2":
-        if specialty_history_type is not None:
-            raise ValueError("Official V2 history cannot load specialty history.")
-        if root is None:
-            root = paths.FROZEN_HISTORY_DIR
     cutoff = academic_part(as_of_part)
     meta_path = history_metadata_path(cutoff, root)
     metadata = json.loads(meta_path.read_text(encoding="utf-8"))
-    if dataset_version is not None and metadata.get("dataset_version") != dataset_version:
-        raise ValueError(f"Frozen history dataset_version must be {dataset_version}.")
-    require_current_features(metadata)
-    if (metadata.get("format_version") not in (1, 2) or metadata.get("history_type") != "frozen_serving_history"
+    if (metadata.get("history_type") != "frozen_serving_history"
             or metadata.get("as_of_part") != cutoff or metadata.get("source_max_part") != cutoff
             or academic_part(metadata["finalized_through_part"]) < cutoff):
         raise ValueError("Frozen history metadata/cutoff mismatch.")
     course_path = course_history_state_path(cutoff, root)
     specialty_path = specialty_history_state_path(cutoff, root)
-    if dataset_version == "V2" and (
-            specialty_path.exists() or specialty_path.name in metadata["artifact_sha256"]
-            or metadata["format_version"] == 1):
-        raise ValueError("Official V2 history must be base-only; specialty artifacts are forbidden.")
     artifact_paths = [course_path]
-    if metadata["format_version"] == 1 or specialty_path.name in metadata["artifact_sha256"]:
+    if specialty_path.exists() or specialty_path.name in metadata["artifact_sha256"]:
         artifact_paths.append(specialty_path)
     if specialty_history_type is not None and specialty_path not in artifact_paths:
         raise ValueError("This base history bundle contains no specialty history.")
@@ -245,8 +213,8 @@ def load_frozen_history(as_of_part, *, root=None, specialty_history_type=None, d
     if specialty_path in artifact_paths:
         with specialty_path.open("rb") as stream:
             payload = pickle.load(stream)
-        if payload.get("format_version") != 1:
-            raise ValueError("Unsupported specialty history format.")
+        if not {"as_of_part", "global_totals", "degree_totals", "requirement_totals"}.issubset(payload):
+            raise ValueError("Incomplete specialty history state.")
         if payload.get("as_of_part") != cutoff:
             raise ValueError("Course and specialty history cutoffs must match the requested as_of_part.")
         if specialty_history_type is not None:
@@ -259,7 +227,7 @@ def load_frozen_history(as_of_part, *, root=None, specialty_history_type=None, d
 
 
 def save_frozen_history_atomic(course, metadata, *, root=None):
-    """Stage/verify/publish a new base-only V2 bundle without replacing a version.
+    """Stage/verify/publish a new base-only history bundle without replacement.
 
     Existing save/load behavior stays unchanged. A same-filesystem staging
     directory keeps partial files invisible to latest-bundle discovery. The
@@ -267,8 +235,6 @@ def save_frozen_history_atomic(course, metadata, *, root=None):
     verification and provenance construction finish before directory rename;
     the caller can then swap its active state without further filesystem I/O.
     """
-    if metadata.get("dataset_version") != "V2":
-        raise ValueError("Atomic history publication requires base-only V2 metadata.")
     root = Path(paths.FROZEN_HISTORY_DIR if root is None else root)
     destination = frozen_history_dir(course.as_of_part, root)
     root.mkdir(parents=True, exist_ok=True)
@@ -282,7 +248,7 @@ def save_frozen_history_atomic(course, metadata, *, root=None):
         saved["created_at"] = saved["created_at_utc"]
         meta_path = history_metadata_path(course.as_of_part, staging)
         meta_path.write_text(json.dumps(saved, indent=2, ensure_ascii=False, allow_nan=False), encoding="utf-8")
-        loaded, _, provenance = load_frozen_history(course.as_of_part, root=staging, dataset_version="V2")
+        loaded, _, provenance = load_frozen_history(course.as_of_part, root=staging)
         if (loaded.global_sums != course.global_sums or loaded.smoothing_k != course.smoothing_k
                 or loaded.min_support != course.min_support):
             raise ValueError("Reloaded history differs from the staged state.")

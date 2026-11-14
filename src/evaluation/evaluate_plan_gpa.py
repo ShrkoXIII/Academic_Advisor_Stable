@@ -10,11 +10,9 @@ import numpy as np
 import pandas as pd
 
 from src.features.feature_contract import (
-    FEATURE_ENGINEERING_VERSION,
     BASE_FEATURES,
     load_category_levels,
     prepare_model_matrix,
-    require_current_features,
 )
 from src.grade_scale import GradeScale
 from src.paths import (
@@ -132,7 +130,6 @@ def build_metrics_report(course_predictions, plans):
         by_part[str(int(part_id))] = summarize_plan_errors(part_plans)
     return {
         "evaluation_unit": "student_id + degree_id + part_id",
-        "feature_engineering_version": FEATURE_ENGINEERING_VERSION,
         "actual_plan_gpa_formula": (
             "sum(course_credits * actual_points) / sum(course_credits)"
         ),
@@ -173,10 +170,8 @@ def print_report(report, plans):
 def main():
     import lightgbm as lgb
 
-    require_current_features(json.loads(MODEL_METADATA_PATH.read_text(encoding="utf-8")))
     columns = list(dict.fromkeys([*AUDIT_COLUMNS, *BASE_FEATURES]))
     test = pd.read_parquet(TEMPORAL_TEST_FEATURES_PATH, columns=columns)
-    require_current_features(test.attrs)
     course_predictions = predict_course_points(
         test,
         lgb.Booster(model_file=str(GRADE_MODEL_PATH)),
@@ -185,7 +180,6 @@ def main():
     )
     plans = aggregate_plan_gpa(course_predictions)
     report = build_metrics_report(course_predictions, plans)
-    report["dataset_version"] = "V2"
     report["sources"] = {
         "test_features": TEMPORAL_TEST_FEATURES_PATH.relative_to(PROJECT_ROOT).as_posix(),
         "grade_model": GRADE_MODEL_PATH.relative_to(PROJECT_ROOT).as_posix(),

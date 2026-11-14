@@ -91,7 +91,6 @@ def artifact_root(tmp_path, monkeypatch):
             })
         write_json(tmp_path / category_path, levels)
     official = {
-        "feature_engineering_version": 3,
         "feature_contract": expected_contract("stage2"),
         "targets": {"grade_regressor": "final_mark", "fail_risk_classifier": "(final_mark < 50).astype(int)"},
         "course_history": {"initial_history_cutoff": 20243, "test_state_frozen_after_part": 20251},
@@ -131,7 +130,7 @@ def artifact_root(tmp_path, monkeypatch):
     ]
     first_contract = expected_contract("stage1")
     source = {
-        "experiment": "course_only_recommendation", "dataset_version": "V2", "feature_engineering_version": 3,
+        "experiment": "course_only_recommendation",
         "feature_contract": {key: first_contract[key] for key in ["model_features", "feature_count", "removed_features"]},
         "training_as_of_part": 20243,
         "grade": {"selected_candidate": {"candidate": {"name": "capaciy_63"}}, "parameters": {"objective": "regression"}},
@@ -200,9 +199,6 @@ def test_promotion_copies_exact_bytes_and_archives_original_provenance(artifact_
         assert (root / SOURCE_DIR / original).read_bytes() == (root / PROMOTED_DIR / copied).read_bytes()
     assert {name: digest(root / name) for name in before} == before
     assert manifest == read_json(root / PROMOTED_DIR / "manifest.json")
-    assert manifest["manifest_version"] == 1
-    assert manifest["dataset_version"] == "V2"
-    assert manifest["feature_engineering_version"] == 3
     for stage in ["stage1", "stage2"]:
         entry = manifest["stages"][stage]
         assert entry["feature_contract"] == expected_contract(stage)
@@ -220,7 +216,6 @@ def test_promotion_copies_exact_bytes_and_archives_original_provenance(artifact_
     assert evidence["metadata"]["grade"]["selected_candidate"]["candidate"]["name"] == "capaciy_63"
     grade_scale_hash = digest(root / "data/raw/v_acs_grade.parquet")
     assert manifest["grade_scale"]["grade_scale_sha256"] == grade_scale_hash
-    assert manifest["grade_scale"]["grade_scale_version"] == f"sha256:{grade_scale_hash}"
     assert manifest["prediction_contract"] == {
         "grade": {"clip": [0, 100], "expected_points_method": "predicted_mark_to_grade_scale"},
         "fail": {"clip": [0, 1]}, "reject_non_finite": True, "reject_wrong_shape": True,
@@ -494,10 +489,9 @@ def test_runtime_load_needs_no_experiment_or_training_file_reads_or_imports(arti
     assert load(root).stage1.grade_model.num_feature() == 31
 
 
-@pytest.mark.parametrize("field,value", [("dataset_version", "V1"), ("feature_engineering_version", 1), ("manifest_version", 99)])
-def test_loader_rejects_incompatible_manifest_version(artifact_root, field, value):
+def test_loader_rejects_incomplete_manifest_schema(artifact_root):
     promote(artifact_root)
-    mutate_manifest(artifact_root, lambda m: m.__setitem__(field, value))
+    mutate_manifest(artifact_root, lambda m: m.pop("stages"))
     with pytest.raises(ValueError):
         load(artifact_root)
 

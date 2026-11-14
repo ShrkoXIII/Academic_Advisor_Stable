@@ -4,7 +4,7 @@
 
 **Goal:** Remove `plan_course_type_id` and all average-attempt features/sums from training, inference, frozen-history storage, and finalized history updates.
 
-**Architecture:** Keep per-candidate `attempt_number` and historical `course_history_retake_rate`/`retake_sum`; remove the average-attempt aggregate and its model consumers. Bump feature engineering and delta format versions so stale models, history bundles, and delta payloads cannot silently match the new contract.
+**Architecture:** Keep per-candidate `attempt_number` and historical `course_history_retake_rate`/`retake_sum`; remove the average-attempt aggregate and its model consumers. Preserve compatibility through the ordered feature and payload structure without numeric contract labels.
 
 **Tech Stack:** Python, pandas, NumPy, pytest, LightGBM artifact manifests.
 
@@ -51,7 +51,7 @@
 
 - [x] **Step 1: Write failing tests** asserting the three removed average-attempt model columns and `plan_course_type_id` are absent from both model contracts; Stage 1 is 31, Stage 2 is 43, plan context is 12; candidate normalization accepts input without `plan_course_type_id`; remaining plan-context outputs preserve order and representative values.
 - [x] **Step 2: Run focused tests and verify expected failures** in feature-contract, temporal-feature, two-stage artifact/engine, and candidate/API tests.
-- [x] **Step 3: Implement minimal model-contract changes**; remove the two weighted-attempt plan outputs and direct average feature, preserve retake-rate and candidate attempt-number behavior, bump `FEATURE_ENGINEERING_VERSION` to 3, and repair the documented syntax typo.
+- [x] **Step 3: Implement minimal model-contract changes**; remove the two weighted-attempt plan outputs and direct average feature, preserve retake-rate and candidate attempt-number behavior, and repair the documented syntax typo.
 - [x] **Step 4: Run the focused tests and verify they pass.**
 
 ### Task 2: Remove `attempt_sum` from history storage and update payloads
@@ -67,7 +67,7 @@
 
 **Interfaces:**
 - Consumes: Task 1 keeps `retake_sum` as the only attempt-related history statistic.
-- Produces: `HISTORY_SUM_COLUMNS` and delta rows without `attempt_sum`; history delta canonical format version 2.
+- Produces: `HISTORY_SUM_COLUMNS` and delta rows without `attempt_sum`; canonical history delta payload.
 
 - [x] **Step 1: Write failing tests** asserting new delta rows require no `attempt_sum`, reject legacy rows containing it, preserve retake counts, and update history state without an attempt-sum column or total.
 - [x] **Step 2: Run focused tests and verify expected failures** in temporal history and update-payload tests.
@@ -82,7 +82,7 @@
 
 **Interfaces:**
 - Consumes: Tasks 1–2 feature and history contracts.
-- Produces: repository tests and changelog aligned to the new feature/history versions.
+- Produces: repository tests and changelog aligned to the final feature/history contract.
 
 - [x] **Step 1: Update remaining fixtures and assertions** to the 43/31 feature counts and attempt-sum-free history contract without weakening unrelated checks.
 - [x] **Step 2: Run focused tests, then the repository test suite; record any environment-blocked tests accurately.**

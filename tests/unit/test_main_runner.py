@@ -21,7 +21,7 @@ def test_data_order_and_dry_run_never_execute(monkeypatch, capsys):
     assert "src.experiments" not in output
     assert "build_frozen_history" not in output
     assert "publish_artifacts" not in output
-    assert "V1" not in output and "V2" not in output
+    assert "One canonical Stable pipeline" in output
 
 
 def test_failure_stops_the_pipeline(monkeypatch):

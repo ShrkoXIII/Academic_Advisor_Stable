@@ -4,7 +4,6 @@ import pytest
 
 from src.evaluation import evaluate_plan_gpa as evaluation
 from src.grade_scale import GradeScale
-from src.features.feature_contract import FEATURE_ENGINEERING_VERSION
 
 
 class FixedMarks:
@@ -100,7 +99,6 @@ def test_build_metrics_report_preserves_contract_and_parts():
     assert report["evaluation_unit"] == "student_id + degree_id + part_id"
     assert report["actual_plan_gpa_formula"] == "sum(course_credits * actual_points) / sum(course_credits)"
     assert report["predicted_plan_gpa_formula"] == "sum(course_credits * predicted_points) / sum(course_credits)"
-    assert report["feature_engineering_version"] == FEATURE_ENGINEERING_VERSION
 
 
 def test_import_does_not_run_evaluation():

@@ -60,7 +60,7 @@ def save_initial(root, part=20243):
     state = weighted_state()
     state.as_of_part = part
     frozen.save_frozen_history(state, None, {
-        "dataset_version": "V2", "source_min_part": 20211,
+        "source_min_part": 20211,
         "source_max_part": part, "source_row_count": 2,
         "source_part_counts": {"20211": 1, str(part): 1},
         "finalized_through_part": part,
@@ -126,7 +126,6 @@ def test_delta_identity_is_canonical_and_state_bytes_are_deterministic(tmp_path)
         state = module.apply_history_delta(weighted_state(), payload)
         frozen.save_frozen_history(state, None, {
             "source_max_part": 20251, "finalized_through_part": 20251,
-            "dataset_version": "V2",
         }, root=tmp_path / label)
     assert frozen.file_sha256(tmp_path / "a/as_of_20251/course_history_state.pkl") == frozen.file_sha256(tmp_path / "b/as_of_20251/course_history_state.pkl")
     changed = deepcopy(first)
@@ -205,13 +204,13 @@ def test_update_publishes_verified_immutable_bundle_and_lineage(tmp_path):
     current = manager.capture(target_part=20252)
     assert old.as_of_part == 20243 and current.as_of_part == 20251
     assert_frame_equal(old.apply(targets()), old_features)
-    loaded, _, meta = frozen.load_frozen_history(20251, root=tmp_path, dataset_version="V2")
+    loaded, _, meta = frozen.load_frozen_history(20251, root=tmp_path)
     assert loaded.global_sums["raw_count"] == 5
     assert meta["previous_as_of_part"] == 20243
     assert meta["previous_history_sha256"] == before["as_of_20243/course_history_state.pkl"]
     assert meta["new_history_sha256"] == frozen.file_sha256(tmp_path / "as_of_20251/course_history_state.pkl")
     assert meta["delta_sha256"] == result["delta_sha256"]
-    assert meta["created_at"] and meta["feature_engineering_version"] == 3
+    assert meta["created_at"]
     assert meta["source_row_count"] == 5 and meta["source_part_counts"]["20251"] == 3
     assert current.metadata["directory"] == str((tmp_path / "as_of_20251").resolve())
     assert all(hashes(tmp_path)[name] == digest for name, digest in before.items())
@@ -345,7 +344,6 @@ def test_latest_valid_load_skips_incomplete_corrupt_and_wrong_version(tmp_path):
     save_initial(tmp_path, part=20261)
     path = tmp_path / "as_of_20261/metadata.json"
     metadata = json.loads(path.read_text())
-    metadata["dataset_version"] = "V1"
     path.write_text(json.dumps(metadata))
     manager = module.FrozenHistoryManager.load(root=tmp_path)
     assert manager.capture(target_part=20262).as_of_part == 20251
@@ -397,7 +395,7 @@ def test_concurrent_same_delta_adds_only_once(tmp_path):
     with ThreadPoolExecutor(max_workers=2) as pool:
         results = list(pool.map(lambda _: manager.update_history_from_payload(history_payload=delta()), range(2)))
     assert sorted(r["status"] for r in results) == ["already_applied", "applied"]
-    loaded, _, _ = frozen.load_frozen_history(20251, root=tmp_path, dataset_version="V2")
+    loaded, _, _ = frozen.load_frozen_history(20251, root=tmp_path)
     assert loaded.global_sums["raw_count"] == 5
 
 
@@ -454,7 +452,7 @@ def test_cleanup_failure_after_publication_does_not_report_failed_update(tmp_pat
     assert result["status"] == "applied"
     assert manager.capture(target_part=20252).as_of_part == 20251
     assert result["cleanup_warnings"]
-    loaded, _, _ = frozen.load_frozen_history(20251, root=tmp_path, dataset_version="V2")
+    loaded, _, _ = frozen.load_frozen_history(20251, root=tmp_path)
     assert loaded.global_sums["raw_count"] == 5
 
 
@@ -472,7 +470,7 @@ def test_update_uses_normalized_delta_even_if_callers_payload_changes(tmp_path, 
 
     monkeypatch.setattr(module, "normalize_history_delta", normalize_then_mutate)
     result = manager.update_history_from_payload(history_payload=payload)
-    loaded, _, meta = frozen.load_frozen_history(20251, root=tmp_path, dataset_version="V2")
+    loaded, _, meta = frozen.load_frozen_history(20251, root=tmp_path)
     assert loaded.global_sums["mark_sum"] == 270
     assert meta["delta_sha256"] == original_normalize(delta()).delta_sha256 == result["delta_sha256"]
 

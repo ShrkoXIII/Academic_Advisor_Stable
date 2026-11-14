@@ -77,7 +77,7 @@ def _select_steps(args, parser):
 
 def _list_steps():
     print("Standard build order: " + " -> ".join(STANDARD_SECTIONS))
-    print("One canonical Stable pipeline; serialized feature/history contract version 2.\n")
+    print("One canonical Stable pipeline and one serialized feature/history contract.\n")
     for section, steps in PIPELINE.items():
         print(f"{section}:")
         for step in steps:

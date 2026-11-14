@@ -13,7 +13,6 @@ import numpy as np
 import pandas as pd
 
 from src import paths
-from src.features.feature_contract import FEATURE_ENGINEERING_VERSION
 from src.features.temporal_features import (
     COURSE_HISTORY_COLUMNS, PLAN_CONTEXT_COLUMNS, compute_plan_context_features,
 )
@@ -238,12 +237,10 @@ class TwoStagePlanRecommender:
                     record["courses"] = scored.loc[scored.plan_id.eq(record["plan_id"]), COURSE_OUTPUT_COLUMNS].to_dict("records")
                     recommendations.append(_json_value(record))
         metadata = {
-            **ranking_metadata, "dataset_version": "V2",
-            "feature_engineering_version": FEATURE_ENGINEERING_VERSION,
+            **ranking_metadata,
             "student_id": snapshot["student_id"], "degree_id": snapshot["degree_id"], "part_id": target,
             "input_fingerprint_version": "normalized_payload_v1", "input_sha256": input_sha256,
             "history": history_metadata, "skipped_history_bundles": deepcopy(self.history_manager.skipped_bundles),
-            "manifest_version": self._manifest["manifest_version"],
             "models": {stage: {"models": entry["models"], "category_levels": {
                 key: entry["category_levels"][key] for key in ("path", "sha256")},
                 "training_as_of_part": entry["training_as_of_part"], "feature_contract": entry["feature_contract"]}

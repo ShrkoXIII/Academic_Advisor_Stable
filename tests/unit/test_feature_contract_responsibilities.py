@@ -6,7 +6,6 @@ import pandas as pd
 
 from src.features.feature_contract import (
     CATEGORICAL_FEATURES,
-    FEATURE_ENGINEERING_VERSION,
     LEAKAGE_COLUMNS,
     NUMERIC_FEATURES,
     RAW_ID_COLUMNS,
@@ -55,7 +54,6 @@ class FeatureContractResponsibilitiesTests(unittest.TestCase):
         )
         result = prepare_model_matrix(source, learn_category_levels(fit))
 
-        self.assertEqual(FEATURE_ENGINEERING_VERSION, 3)
         self.assertEqual(BASE_FEATURES, [*NUMERIC_FEATURES, *CATEGORICAL_FEATURES])
         self.assertEqual(result.columns.tolist(), BASE_FEATURES)
         self.assertTrue(set(BASE_FEATURES).isdisjoint(LEAKAGE_COLUMNS))
@@ -77,7 +75,6 @@ class FeatureContractResponsibilitiesTests(unittest.TestCase):
             "peer_credit_weighted_avg_attempt",
         }
 
-        self.assertEqual(FEATURE_ENGINEERING_VERSION, 3)
         self.assertEqual(len(BASE_FEATURES), 43)
         self.assertTrue(removed.isdisjoint(BASE_FEATURES))
 

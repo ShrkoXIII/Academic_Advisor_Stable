@@ -4,7 +4,7 @@ import pandas as pd
 
 from src.features.feature_contract import (
     BASE_FEATURES, CATEGORICAL_FEATURES, CATEGORY_MISSING, CATEGORY_UNKNOWN,
-    FEATURE_ENGINEERING_VERSION, NUMERIC_FEATURES,
+    NUMERIC_FEATURES,
 )
 from src.features.temporal_features import CourseHistoryState
 from src.grade_scale import GradeScale
@@ -60,14 +60,12 @@ def synthetic_course_history(as_of_part=20243):
 def synthetic_components(history=None, *, grade=60., fail=.1):
     levels = {column: [CATEGORY_MISSING, CATEGORY_UNKNOWN, "1", "T", "R"]
               for column in CATEGORICAL_FEATURES}
-    metadata = {"feature_engineering_version": FEATURE_ENGINEERING_VERSION,
-                "dataset_version": "V2", "training_as_of_part": 20243,
+    metadata = {"training_as_of_part": 20243,
                 "targets": {"grade_regressor": "final_mark", "fail_risk_classifier": "is_fail"},
                 "feature_contract": {"model_features": BASE_FEATURES,
                                      "numeric_features": NUMERIC_FEATURES,
                                      "categorical_features": CATEGORICAL_FEATURES}}
-    provenance = {"dataset_version": "V2", "feature_engineering_version": FEATURE_ENGINEERING_VERSION,
-                  "training": {"grade": {"training_as_of_part": 20243},
+    provenance = {"training": {"grade": {"training_as_of_part": 20243},
                                "fail_risk": {"training_as_of_part": 20243}},
                   "artifact_sha256": {"synthetic_grade": "mock", "synthetic_fail": "mock"}}
     return (RecordingModel(grade), RecordingModel(fail), levels, synthetic_grade_scale(),

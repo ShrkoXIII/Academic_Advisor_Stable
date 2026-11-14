@@ -1,6 +1,5 @@
 import pandas as pd
 
-from src.features.feature_contract import FEATURE_ENGINEERING_VERSION
 from src.paths import (
     CLEAN_STUDENT_STATUS_PATH,
     COURSE_HISTORY_STATE_PATH,
@@ -72,7 +71,6 @@ def build_feature_tables(train, test, train_roster, test_roster, student_status=
     for frame in [train, test]:
         frame["part_semester"] = (frame["part_id"] % 10).astype("Int64")
         frame["is_fail"] = frame["final_mark"].lt(50).astype("int64")
-        frame.attrs["feature_engineering_version"] = FEATURE_ENGINEERING_VERSION
 
     return train, test, state
 

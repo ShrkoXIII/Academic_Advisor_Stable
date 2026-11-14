@@ -21,7 +21,7 @@
 
 - Preserve the source working copy, including its existing uncommitted status helper extraction.
 - Preserve nullable dtypes, column order, stable sorts, attempt ordering, and outlier thresholds.
-- Keep legacy _V2 module variable names for unchanged monkeypatch targets, bound to a single unversioned path per artifact.
+- Keep legacy module variable names for unchanged monkeypatch targets, bound to a single path per artifact.
 - Document the missing Data Building input for diploma main and the resulting outlier dependency.
 - Validate from an isolated environment and verify source hashes after all checks.
 

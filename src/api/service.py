@@ -19,8 +19,8 @@ from .catalog import load_catalog
 from .validators.common import ApiError, identifier, number, part
 
 
-PUBLIC_METADATA = {"dataset_version", "feature_engineering_version", "input_fingerprint_version", "input_sha256",
-                   "manifest_version", "grade_scale_sha256", "grade_scale_version", "grade_model_target",
+PUBLIC_METADATA = {"input_fingerprint_version", "input_sha256",
+                   "grade_scale_sha256", "grade_model_target",
                    "expected_points_method", "balance_policy_version", "received_candidate_count", "candidate_count",
                    "stage1_row_count", "feasible_plan_count", "shortlist_count", "shortlist_limit", "shortlist_plan_ids",
                    "scored_plan_count", "stage2_row_count", "returned_plan_count", "top_k", "global_top_k_guaranteed",
@@ -141,7 +141,7 @@ class ApiService:
             columns = stage["feature_contract"]["model_features"]
             if any("specialty_history" in column or "degree_history" in column for column in columns):
                 raise ValueError("SPECIALTY_HISTORY_AGGREGATES_UNAVAILABLE")
-        if metadata.get("dataset_version") != "V2" or state.as_of_part != metadata.get("as_of_part"):
+        if state.as_of_part != metadata.get("as_of_part"):
             raise ValueError("SERVING_HISTORY_INCOMPATIBLE")
 
     def _load_history(self):

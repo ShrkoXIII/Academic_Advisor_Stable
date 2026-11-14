@@ -1,4 +1,4 @@
-"""Reuse official V2 training mechanics; write exclusively experiment artifacts."""
+"""Reuse the canonical training mechanics; write exclusively experiment artifacts."""
 from datetime import datetime, timezone
 import json
 from time import perf_counter
@@ -8,8 +8,8 @@ import numpy as np
 import pandas as pd
 
 from src.features.feature_contract import (
-    BASE_FEATURES, FEATURE_ENGINEERING_VERSION, learn_category_levels,
-    load_category_levels, prepare_model_matrix, require_current_features, save_category_levels,
+    BASE_FEATURES, learn_category_levels,
+    load_category_levels, prepare_model_matrix, save_category_levels,
 )
 from src.features.frozen_history import file_sha256
 from src.modeling import train_models as official
@@ -60,8 +60,6 @@ def train_experiment():
     columns = list(dict.fromkeys(["student_id", "degree_id", "course_id", "part_id", TARGET_GRADE, TARGET_FAIL, *BASE_FEATURES]))
     train = pd.read_parquet(TEMPORAL_TRAIN_FEATURES_PATH, columns=columns)
     test = pd.read_parquet(TEMPORAL_TEST_FEATURES_PATH, columns=columns)
-    require_current_features(train.attrs)
-    require_current_features(test.attrs)
     if train.part_id.max() >= test.part_id.min():
         raise ValueError("Training and holdout temporal cutoffs overlap.")
     COURSE_ONLY_MODEL_DIR.mkdir(parents=True, exist_ok=True)
@@ -78,16 +76,15 @@ def train_experiment():
     train_x, test_x = prepare_course_matrix(train, levels), prepare_course_matrix(test, levels)
     weight = training_weights(train).to_numpy(dtype="float32")
     metadata = {
-        "experiment": "course_only_recommendation", "dataset_version": "V2",
+        "experiment": "course_only_recommendation",
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
-        "feature_engineering_version": FEATURE_ENGINEERING_VERSION,
         "feature_contract": {"model_features": COURSE_ONLY_FEATURES, "feature_count": 31,
                              "removed_features": sorted(REMOVED_CONTEXT_FEATURES)},
         "training_as_of_part": int(train.part_id.max()), "train_rows": len(train), "test_rows": len(test),
         "temporal_folds": official.TEMPORAL_FOLDS,
         "training_weight": {"before_2022": .25, "from_2022": 1., "fit_only": True},
         "seed": official.SEED, "input_sha256": signature,
-        "holdout_history_protocol": "existing_V2_features_sequential_roll_forward",
+        "holdout_history_protocol": "canonical_features_sequential_roll_forward",
     }
     predictions = test[["student_id", "degree_id", "course_id", "part_id", TARGET_GRADE, TARGET_FAIL]].copy()
     official_levels = load_category_levels(CATEGORY_LEVELS_PATH)
@@ -129,7 +126,6 @@ def train_experiment():
 
 def load_experiment():
     metadata = json.loads((COURSE_ONLY_MODEL_DIR / "model_metadata.json").read_text(encoding="utf-8"))
-    require_current_features(metadata)
     if metadata["feature_contract"]["model_features"] != COURSE_ONLY_FEATURES or metadata["input_sha256"] != training_signature():
         raise ValueError("Experiment feature contract or input/source signature changed; refuse stale models.")
     for name, digest in metadata["artifact_sha256"].items():

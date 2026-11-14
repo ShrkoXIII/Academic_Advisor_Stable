@@ -1,4 +1,4 @@
-"""Durable administration over the existing base-only immutable V2 history.
+"""Durable administration over the canonical base-only immutable history.
 
 The small control file is the active pointer and administrative configuration.
 Immutable bundle publication remains owned by FrozenHistoryManager. This module
@@ -176,7 +176,7 @@ class CumulativeHistoryStore:
         root = self.legacy_root if legacy else self.root
         if root is None:
             raise FileNotFoundError("Requested exact history version is unavailable.")
-        state, _, metadata = load_frozen_history(cutoff, root=root, dataset_version="V2")
+        state, _, metadata = load_frozen_history(cutoff, root=root)
         validate_history_state(state)
         _validate_update_metadata(metadata)
         return HistorySnapshot(state, metadata)
@@ -268,7 +268,7 @@ class CumulativeHistoryStore:
             source_metadata_path = source_root / f"as_of_{BASELINE_PART}" / "metadata.json"
             if file_sha256(source_metadata_path) != expected_source_hash:
                 raise HistoryUpdateError("SOURCE_HASH_MISMATCH", "Approved baseline metadata hash differs from source.")
-            state, _, metadata = load_frozen_history(BASELINE_PART, root=source_root, dataset_version="V2")
+            state, _, metadata = load_frozen_history(BASELINE_PART, root=source_root)
             validate_history_state(state)
             _validate_update_metadata(metadata)
             counts = metadata.get("source_part_counts", {})

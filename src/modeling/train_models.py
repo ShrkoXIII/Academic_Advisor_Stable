@@ -22,12 +22,10 @@ from sklearn.metrics import (
 try:
     from src.features.feature_contract import (
         CATEGORICAL_FEATURES,
-        FEATURE_ENGINEERING_VERSION,
         BASE_FEATURES,
         NUMERIC_FEATURES,
         learn_category_levels,
         prepare_model_matrix,
-        require_current_features,
         save_category_levels,
     )
     from ..paths import (
@@ -42,12 +40,10 @@ try:
 except ImportError:
     from src.features.feature_contract import (
         CATEGORICAL_FEATURES,
-        FEATURE_ENGINEERING_VERSION,
         BASE_FEATURES,
         NUMERIC_FEATURES,
         learn_category_levels,
         prepare_model_matrix,
-        require_current_features,
         save_category_levels,
     )
     from src.paths import (
@@ -370,8 +366,6 @@ def main():
     )
     train = pd.read_parquet(TEMPORAL_TRAIN_FEATURES_PATH, columns=data_columns)
     test = pd.read_parquet(TEMPORAL_TEST_FEATURES_PATH, columns=data_columns)
-    require_current_features(train.attrs)
-    require_current_features(test.attrs)
 
     prepared_folds = prepare_folds(train)
     best_grade, grade_candidates = tune_model(prepared_folds, "grade")
@@ -419,7 +413,6 @@ def main():
     save_category_levels(final_levels, CATEGORY_LEVELS_PATH)
 
     metadata = {
-        "feature_engineering_version": FEATURE_ENGINEERING_VERSION,
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "model_family": "LightGBM",
         "feature_contract": {

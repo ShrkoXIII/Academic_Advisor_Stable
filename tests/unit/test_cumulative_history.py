@@ -32,7 +32,7 @@ def source(root, *, cutoff=20251, cumulative=True):
     ]))
     counts = {str(part): sum(p == part for p, _, _ in outcomes) for part, _, _ in outcomes}
     save_frozen_history(state, None, {
-        "dataset_version": "V2", "source_min_part": min(p for p, _, _ in outcomes), "source_max_part": cutoff,
+        "source_min_part": min(p for p, _, _ in outcomes), "source_max_part": cutoff,
         "source_row_count": len(outcomes), "source_part_counts": counts,
         "finalized_through_part": cutoff,
     }, root=root)
@@ -84,7 +84,7 @@ def test_lazy_defaults_and_persistent_modes(tmp_path):
 
 def test_approved_initialization_preserves_full_weighted_history_and_source(tmp_path):
     store, baseline, old = initialize(tmp_path)
-    loaded, _, metadata = load_frozen_history(20251, root=store.root, dataset_version="V2")
+    loaded, _, metadata = load_frozen_history(20251, root=store.root)
     assert loaded.global_sums == baseline.global_sums
     assert loaded.global_sums["raw_count"] == 3
     assert loaded.global_sums["effective_support"] == 2.25
@@ -127,7 +127,7 @@ def test_preview_commit_activation_separate_and_sequential_raw_equivalence(tmp_p
              "attempt_number": attempt, "final_mark": mark}
             for attempt, mark in [(1, 40), (2, 80)]
         ]))
-        saved, _, _ = load_frozen_history(part, root=store.root, dataset_version="V2")
+        saved, _, _ = load_frozen_history(part, root=store.root)
         assert saved.global_sums == oracle.global_sums
         for level in oracle.tables:
             assert_frame_equal(saved.tables[level].sort_index(), oracle.tables[level].sort_index())
@@ -425,10 +425,10 @@ def test_normal_capture_after_rollback_cannot_bypass_active_pointer(tmp_path):
 def test_preexisting_bundle_without_activation_record_cannot_be_served(tmp_path):
     store, _, _ = initialize(tmp_path)
     from src.recommendation.history_update import apply_history_delta
-    baseline, _, _ = load_frozen_history(20251, root=store.root, dataset_version="V2")
+    baseline, _, _ = load_frozen_history(20251, root=store.root)
     state = apply_history_delta(baseline, payload())
     save_frozen_history(state, None, {
-        "dataset_version": "V2", "source_min_part": 20211, "source_max_part": 20252,
+        "source_min_part": 20211, "source_max_part": 20252,
         "source_row_count": 5, "source_part_counts": {"20211": 1, "20243": 1, "20251": 1, "20252": 2},
         "finalized_through_part": 20252,
     }, root=store.root)

@@ -79,7 +79,7 @@ def test_verified_artifact_loader_accepts_complete_human_approval(artifact_root)
     lambda m: m["ranking_approval"].update(combination="UNAPPROVED"),
     lambda m: m["ranking_policy"].update(schema_version=True),
     lambda m: m["ranking_policy"]["stage1_shortlist_strategy"].update(name="unknown"),
-    lambda m: m["ranking_policy"]["final_ranking_strategy"].update(version="v2"),
+    lambda m: m["ranking_policy"]["final_ranking_strategy"].update(version="unrecognized"),
     lambda m: m["ranking_policy"]["approved_combination"]["final_ranking_strategy"].update(name="balance_first"),
     lambda m: m["ranking_policy"]["balance_policy"].update(failed_band=["0", "1"]),
     lambda m: m["ranking_policy"]["balance_policy"].update(semesters=[1, 2, 3]),

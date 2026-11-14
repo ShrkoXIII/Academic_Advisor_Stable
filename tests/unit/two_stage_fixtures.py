@@ -4,7 +4,6 @@ from copy import deepcopy
 import numpy as np
 import pandas as pd
 
-from src.features.feature_contract import FEATURE_ENGINEERING_VERSION
 from src.features.frozen_history import save_frozen_history
 from src.features.temporal_features import CourseHistoryState
 from src.recommendation.history_update import FrozenHistoryManager
@@ -72,7 +71,7 @@ def history_state(*, part=20243, size=8):
 def history_manager(root, *, part=20243, size=8):
     state = history_state(part=part, size=size)
     save_frozen_history(state, None, {
-        "dataset_version": "V2", "source_min_part": part, "source_max_part": part,
+        "source_min_part": part, "source_max_part": part,
         "source_row_count": size * 20, "source_part_counts": {str(part): size * 20},
         "finalized_through_part": part,
     }, root=root)
@@ -95,12 +94,9 @@ def synthetic_artifacts(*, grade1=95., fail1=.01, grade2=60., fail2=.2):
                                 "path": f"models/synthetic/{stage}_levels.json"},
         }
     manifest = {
-        "manifest_version": 1, "dataset_version": "V2",
-        "feature_engineering_version": FEATURE_ENGINEERING_VERSION,
         "prediction_contract": deepcopy(PREDICTION_CONTRACT),
         "ranking_approval": deepcopy(UNAPPROVED_RANKING), "stages": stages,
-        "grade_scale": {"path": "data/synthetic/grade.parquet", "grade_scale_sha256": "4" * 64,
-                        "grade_scale_version": "sha256:" + "4" * 64},
+        "grade_scale": {"path": "data/synthetic/grade.parquet", "grade_scale_sha256": "4" * 64},
     }
     return TwoStageArtifacts(
         ModelPair(RecordingStageModel(grade1), RecordingStageModel(fail1), deepcopy(levels)),

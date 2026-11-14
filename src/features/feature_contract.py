@@ -3,17 +3,6 @@ import json
 import pandas as pd
 
 
-FEATURE_ENGINEERING_VERSION = 3
-
-
-def require_current_features(metadata):
-    if metadata.get("feature_engineering_version") != FEATURE_ENGINEERING_VERSION:
-        raise ValueError(
-            "Stale feature engineering: rebuild temporal features, retrain models, "
-            "then rerun evaluation. Artifacts from an older feature contract cannot be used."
-        )
-
-
 CATEGORY_MISSING = "__MISSING__"
 CATEGORY_UNKNOWN = "__UNKNOWN__"
 
@@ -78,7 +67,6 @@ NUMERIC_FEATURES = [
 ]
 
 BASE_FEATURES = [*NUMERIC_FEATURES, *CATEGORICAL_FEATURES]
-
 # Documentation guard: these columns are deliberately outside BASE_FEATURES.
 LEAKAGE_COLUMNS = [
     "final_mark",

@@ -8,7 +8,8 @@ import pandas as pd
 
 from src.data.cleaning.cleaning_utils import clean_id
 from .course_status import VALID_CANDIDATE_GROUPS as _CANDIDATE_GROUPS
-from .plan_generation import enumerate_plan_indices, sum_credit_values
+from .plan_generation import enumerate_plan_indices
+from .registration_policy import remaining_requirement_credits, sum_credit_values
 
 
 def _credit_value(value, field, *, positive=False):
@@ -59,9 +60,9 @@ def normalize_requirement_policies(records):
         overflow = _credit_value(record.get("allowed_overflow_credits", 0), "allowed_overflow_credits")
         completed = _credit_value(record.get("completed_credits", 0), "completed_credits")
         reserved = _credit_value(record.get("reserved_credits", 0), "reserved_credits")
-        result[requirement_id] = max(Decimal("0"), sum_credit_values(
-            (maximum, overflow, completed.copy_negate(), reserved.copy_negate()),
-        ))
+        result[requirement_id] = remaining_requirement_credits(
+            maximum, overflow=overflow, completed=completed, reserved=reserved,
+        )
     return result
 
 

@@ -3,38 +3,8 @@ from decimal import Decimal
 
 import numpy as np
 
-
-def decimal_credit_units(value, decimal_places):
-    """Scale a Decimal exactly using its digits, independent of Decimal context."""
-    parts = value.as_tuple()
-    coefficient = 0
-    for digit in parts.digits:
-        coefficient = coefficient * 10 + digit
-    return (-coefficient if parts.sign else coefficient) * 10 ** (parts.exponent + decimal_places)
-
-
-def sum_credit_values(values):
-    """Exact signed Decimal sum for policy arithmetic and complete-plan caps."""
-    values = tuple(values)
-    places = max([0, *[-value.as_tuple().exponent for value in values]])
-    total = sum(decimal_credit_units(value, places) for value in values)
-    parts = Decimal(total).as_tuple()
-    return Decimal((parts.sign, parts.digits, -places))
-
-
-def resolve_credit_bounds(credits=None, min_credits=None, max_credits=None):
-    """Validate requested bounds; callers use the upper bound as the exact target."""
-    if credits is not None:
-        if min_credits is not None or max_credits is not None:
-            raise ValueError("Use credits OR min_credits/max_credits, not both.")
-        lower = upper = Decimal(str(credits))
-    else:
-        if min_credits is None or max_credits is None:
-            raise ValueError("Supply credits or both min_credits and max_credits.")
-        lower, upper = Decimal(str(min_credits)), Decimal(str(max_credits))
-    if not lower.is_finite() or not upper.is_finite() or lower < 0 or upper <= 0 or lower > upper:
-        raise ValueError("Invalid credit bounds: require 0 <= min <= max and max > 0.")
-    return lower, upper
+from .registration_policy import decimal_credit_units, resolve_credit_bounds
+from .registration_policy import sum_credit_values as sum_credit_values
 
 
 def enumerate_plan_indices(candidate_courses, target_credits=None, *, min_credits=None, max_credits=None,

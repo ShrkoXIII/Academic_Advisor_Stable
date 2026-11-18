@@ -2,6 +2,7 @@
 from collections.abc import Mapping
 
 from src.recommendation.course_status import normalize_previous_status
+from src.recommendation.registration_policy import intersect_credit_bounds
 
 from .common import ApiError, binding, check_record_identity, identifier, number, part, response_data, sourced
 
@@ -218,8 +219,8 @@ def _rules(rules, policy):
         raise ApiError("UNRESOLVED_LOAD_PROFILE", "Applicable registration profile is unresolved.")
     if profile is not None:
         lo, hi = ("MIN_STUDY_CREDITS", "MAX_STUDY_CREDITS") if profile == "study" else ("GRAD_MIN_LIMIT", "GRAD_MAX_LOAD")
-        values["effective_min"] = max(values["MIN_CREDITS"], values[lo])
-        values["effective_max"] = min(values["MAX_CREDITS"], values[hi])
-        if values["effective_min"] > values["effective_max"]:
+        effective = intersect_credit_bounds((values["MIN_CREDITS"], values["MAX_CREDITS"]), (values[lo], values[hi]))
+        if effective is None:
             raise ApiError("CONFLICTING_RULES", "Registration rule ranges do not intersect.")
+        values["effective_min"], values["effective_max"] = effective
     return values

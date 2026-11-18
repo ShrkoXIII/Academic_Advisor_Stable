@@ -137,6 +137,57 @@ def test_credit_range_uses_upper_end_of_provider_intersection(api_client):
     assert all(plan["total_credits"] == 6 for plan in body["recommendations"])
 
 
+@pytest.mark.parametrize(("mode", "completed", "overflow", "feasible_count"), [
+    ("strict_remaining", "9.00", None, 0),
+    ("approved_overflow", "11.00", "5.00", 6),
+    ("approved_overflow", "16.00", "0", 0),
+    ("unbounded", "20", None, 6),
+])
+def test_provider_group_modes_restrict_the_same_exact_target(api_client, mode, completed, overflow, feasible_count):
+    client, _, request = api_client
+    request["target_credits"] = 6
+    rows = request["courses_api_response"]["data"]["availableCourses"]
+    for row in rows:
+        row["REQUIREMENT_PASSED_CREDITS"] = completed
+    rows.append(deepcopy(rows[0]))
+    policy = request["integration_context"]["registration_policy"]
+    policy["requirement_group_modes"]["group-example"] = mode
+    if overflow is not None:
+        policy["group_overflow_credits"] = {"group-example": overflow}
+
+    response = post(client, request)
+    assert response.status_code == 200, response.json()
+    body = response.json()
+    assert body["metadata"]["target_credits"] == "6"
+    assert body["metadata"]["candidate_count"] == 4
+    assert body["metadata"]["feasible_plan_count"] == feasible_count
+    assert body["status"] == ("ok" if feasible_count else "no_feasible_plan")
+    assert len(body["recommendations"]) == min(feasible_count, request["top_k"])
+
+
+def test_conflicting_strict_group_evidence_keeps_course_diagnostics(api_client):
+    client, engine, request = api_client
+    for row in request["courses_api_response"]["data"]["availableCourses"]:
+        row["REQUIREMENT_PASSED_CREDITS"] = "13"
+
+    validation = {key: request[key] for key in (
+        "student_id", "degree_id", "part_id", "courses_api_response", "source_contexts", "integration_context",
+    )}
+    diagnostic = post(client, validation, "/api/v1/inputs/courses/validate")
+    assert diagnostic.status_code == 422
+    failure = diagnostic.json()
+    assert failure["summary"]["candidate_count"] == 0
+    assert [(error["code"], error["field"]) for error in failure["errors"]] == [
+        ("CONFLICTING_GROUP", f"availableCourses[{index}]") for index in range(4)
+    ]
+    response = post(client, request)
+    assert response.status_code == 422
+    error = response.json()["error"]
+    assert error["code"] == "INVALID_INPUTS"
+    assert error["details"]["courses"] == failure
+    assert engine.artifacts.stage1.grade_model.matrices == []
+
+
 @pytest.mark.parametrize(("credits", "code"), [
     ({"target_credits": 3, "min_credits": 3, "max_credits": 6}, "INVALID_REQUEST_SCHEMA"),
     ({"min_credits": 3}, "INVALID_REQUEST_SCHEMA"),

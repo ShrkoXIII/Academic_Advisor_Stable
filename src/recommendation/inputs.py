@@ -7,11 +7,11 @@ import numpy as np
 import pandas as pd
 
 from src.data.cleaning.cleaning_utils import clean_id
-from src.data.academic_calendar import is_regular_semester
+from src.data.academic_calendar import count_regular_semesters_between, is_regular_semester
 
 from .constraints import PlanConstraints, normalize_requirement_policies
 from .course_status import classify_candidate_status
-from .plan_generation import resolve_credit_bounds
+from .registration_policy import resolve_credit_bounds
 
 
 STUDENT_SNAPSHOT_COLUMNS = [
@@ -84,6 +84,26 @@ def _validate_payload_identity(record, student_id, degree_id, part_id, *, requir
             raise ValueError(f"Payload {key} does not match the request.")
 
 
+def derive_semester_and_gpa_trend(
+    part_id: int, gpa_prev_1: float | None, gpa_prev_2: float | None,
+) -> tuple[int, float | None]:
+    """Derive fields from normalized values, preserving the input's missing representation."""
+    trend = None if gpa_prev_1 is None or gpa_prev_2 is None else gpa_prev_1 - gpa_prev_2
+    return part_id % 10, trend
+
+
+def derive_prior_fail_credit_ratio(failed: float | None, registered: float | None) -> float | None:
+    """Use the beginning-of-semester totals when the denominator is available."""
+    return None if registered in (None, 0) or failed is None else failed / registered
+
+
+def derive_observed_gap_semesters(previous_part: int, target_part: int, *, target_registered: bool) -> int:
+    """Count intervening regular terms and the target if it is regular and unregistered."""
+    return count_regular_semesters_between(previous_part, target_part) + (
+        is_regular_semester(target_part) and not target_registered
+    )
+
+
 def normalize_student_payload(snapshot, *, student_id, degree_id, part_id):
     """Accept ready history values and derive only GPA trend and semester.
 
@@ -109,8 +129,9 @@ def normalize_student_payload(snapshot, *, student_id, degree_id, part_id):
     if not 0 <= result["start_agpa_points"] <= 4:   
         raise ValueError("start_agpa_points must be between 0 and 4.")
     result["part_id"] = part_id
-    result["part_semester"] = part_id % 10
-    result["gpa_trend_delta"] = result["gpa_prev_1"] - result["gpa_prev_2"]
+    result["part_semester"], result["gpa_trend_delta"] = derive_semester_and_gpa_trend(
+        part_id, result["gpa_prev_1"], result["gpa_prev_2"],
+    )
     result["gpa_trend_missing"] = int(pd.isna(result["gpa_trend_delta"]))
     return result
 

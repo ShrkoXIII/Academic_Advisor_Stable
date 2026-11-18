@@ -1,13 +1,12 @@
 """Independent validation dependencies and lazy, manifest-gated inference."""
-from collections import defaultdict
 from threading import Lock
 
 from src import paths
 from src.features.frozen_history import validate_history_selection
 from src.grade_scale import GradeScale
 from src.recommendation.history_update import FrozenHistoryManager
-from src.recommendation.plan_generation import sum_credit_values
 from src.recommendation.ranking_policy import validate_ranking_policy
+from src.recommendation.registration_policy import candidate_credit_caps, intersect_credit_bounds
 from src.recommendation.two_stage_artifacts import load_two_stage_artifacts
 from src.recommendation.two_stage_engine import TwoStagePlanRecommender
 
@@ -352,24 +351,23 @@ class ApiService:
             lower, upper = number(request.get("min_credits"), "min_credits"), number(request.get("max_credits"), "max_credits")
         if lower > upper:
             raise ApiError("INVALID_CREDIT_BOUNDS", "Requested credit minimum exceeds maximum.")
-        lower, upper = max(lower, rules["effective_min"]), min(upper, rules["effective_max"])
-        if lower > upper:
+        effective = intersect_credit_bounds((lower, upper), (rules["effective_min"], rules["effective_max"]))
+        if effective is None:
             raise ApiError("CREDIT_RANGE_CONFLICT", "Requested and confirmed credit ranges do not intersect.")
-        categories, groups = defaultdict(list), defaultdict(list)
-        for row in candidates:
-            categories[row["plan_requirement_type_id"]].append(row["course_credits"])
-            groups[row["requirement_group_id"]].append(row["course_credits"])
-        policies = courses.normalized["requirement_group_policies"]
         policy = courses.normalized["registration_policy"]
+        failed = number(policy.get("allowed_failed_repeat_credits"), "allowed_failed_repeat_credits")
+        withdrawn = number(policy.get("allowed_withdrawn_repeat_credits"), "allowed_withdrawn_repeat_credits", nullable=True)
+        type_caps, group_caps = candidate_credit_caps(
+            ((row["plan_requirement_type_id"], row["requirement_group_id"], row["course_credits"]) for row in candidates),
+            courses.normalized["requirement_group_policies"],
+        )
         engine_request = {"student_id": request["student_id"], "degree_id": request["degree_id"], "part_id": target,
-                          "target_credits": upper,
-                          "allowed_failed_repeat_credits": number(policy.get("allowed_failed_repeat_credits"), "allowed_failed_repeat_credits"),
-                          "allowed_withdrawn_repeat_credits": number(policy.get("allowed_withdrawn_repeat_credits"),
-                              "allowed_withdrawn_repeat_credits", nullable=True),
-                          "requirement_policies": [{"plan_requirement_type_id": key, "max_credits": sum_credit_values(values)}
-                                                   for key, values in categories.items()],
-                          "requirement_group_policies": {key: sum_credit_values(groups[key]) if value is None else value
-                                                         for key, value in policies.items()},
+                          "target_credits": effective[1],
+                          "allowed_failed_repeat_credits": failed,
+                          "allowed_withdrawn_repeat_credits": withdrawn,
+                          "requirement_policies": [{"plan_requirement_type_id": key, "max_credits": cap}
+                                                   for key, cap in type_caps.items()],
+                          "requirement_group_policies": group_caps,
                           "max_new_courses": rules["MAX_NEW_COURSES"]}
         if engine_request["allowed_withdrawn_repeat_credits"] is None:
             engine_request.pop("allowed_withdrawn_repeat_credits")

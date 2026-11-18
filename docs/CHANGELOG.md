@@ -150,3 +150,15 @@
 - Shared course-group and request ID definitions across their consumers to prevent drift.
 - Added parity coverage in `tests/unit/test_two_stage_payloads.py`. The full suite had 970 passes, 2 known failures and 2 skips.
 - The [Phase 3 report](reports/API_RECOMMENDATION_PHASE_3_REPORT.md) lists the affected files and before-and-after checks.
+
+## 2026-11-18 — Consolidate registration policy calculations
+- Centralized credit bounds, exact arithmetic and registration caps in `src/recommendation/registration_policy.py`.
+- Updated the API course validators, adapter, service and core inputs and constraints to share calculations while retaining their validation.
+- Added policy and HTTP parity coverage. The full suite had 981 passes, 2 known failures and 2 skips.
+- See the [Phase 4A report](reports/API_RECOMMENDATION_PHASE_4A_REPORT.md) for affected files and verification.
+
+## 2026-11-18 — Phase 4B student snapshot consolidation
+- Shared semester and GPA trend derivation in `src/recommendation/inputs.py`, preserving each boundary's missing values.
+- Delegated failed-credit ratio and enrollment-gap calculations from `src/api/adapters/student.py` while retaining source evidence checks.
+- Added nine cases in `tests/unit/test_student_snapshot_parity.py` and matched before-and-after responses for 13 synthetic student scenarios.
+- All 26 HTTP cases passed. The full suite had 990 passes, 2 known frozen-history filename failures and 2 skips.

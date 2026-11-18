@@ -1,9 +1,11 @@
 """Build beginning-of-semester snapshots without HTTP or new feature formulas."""
 import pandas as pd
 
-from src.data.academic_calendar import count_regular_semesters_between, is_regular_semester
 from src.features.temporal_features import compute_student_gpa_history, add_student_history_features
-from src.recommendation.inputs import BACKEND_SNAPSHOT_COLUMNS
+from src.recommendation.inputs import (
+    BACKEND_SNAPSHOT_COLUMNS, derive_observed_gap_semesters, derive_prior_fail_credit_ratio,
+    derive_semester_and_gpa_trend,
+)
 
 from ..validators.common import ApiError, ValidationResult, number
 from ..validators.student import (
@@ -34,8 +36,9 @@ def build_student_snapshot(info, histories, expected, context, *, settings, grad
     map_student_fields(snapshot, info, settings, result)
     add_sourced_student_values(snapshot, info, expected, context, result)
     add_history_features(histories, info, expected, snapshot, result)
-    denominator, failed = snapshot["prior_total_reg_credits"], snapshot["prior_total_fail_credits"]
-    snapshot["prior_fail_credit_ratio"] = None if denominator in (None, 0) or failed is None else failed / denominator
+    snapshot["prior_fail_credit_ratio"] = derive_prior_fail_credit_ratio(
+        snapshot["prior_total_fail_credits"], snapshot["prior_total_reg_credits"],
+    )
     validate_grade_version(snapshot, grade_scale, result)
     add_snapshot_features(snapshot, expected)
     result.summary["field_readiness"] = {key: "unavailable" if value is None else "ready"
@@ -132,8 +135,9 @@ def add_history_features(histories, info, expected, snapshot, result):
             current_registered = True  # Positive credits prove positive course enrollment.
     if registered and current_registered is not None:
         previous = max(row["part_id"] for row in registered)
-        snapshot["observed_gap_semesters"] = count_regular_semesters_between(previous, expected["part_id"]) + (
-            is_regular_semester(expected["part_id"]) and not current_registered)
+        snapshot["observed_gap_semesters"] = derive_observed_gap_semesters(
+            previous, expected["part_id"], target_registered=current_registered,
+        )
     else:
         result.unavailable_fields.append("observed_gap_semesters")
     result.checks["student_history_schema"] = "verified"
@@ -141,7 +145,7 @@ def add_history_features(histories, info, expected, snapshot, result):
 
 
 def add_snapshot_features(snapshot, expected):
-    snapshot["part_semester"] = expected["part_id"] % 10
-    snapshot["gpa_trend_delta"] = (None if snapshot["gpa_prev_1"] is None or snapshot["gpa_prev_2"] is None
-                                   else snapshot["gpa_prev_1"] - snapshot["gpa_prev_2"])
+    snapshot["part_semester"], snapshot["gpa_trend_delta"] = derive_semester_and_gpa_trend(
+        expected["part_id"], snapshot["gpa_prev_1"], snapshot["gpa_prev_2"],
+    )
     snapshot["gpa_trend_missing"] = int(snapshot["gpa_trend_delta"] is None)

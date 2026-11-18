@@ -1,8 +1,7 @@
 """Map verified course sources into candidate records and registration policies."""
-from decimal import Decimal
 import json
 
-from src.recommendation.plan_generation import sum_credit_values
+from src.recommendation.registration_policy import requirement_group_cap
 
 from ..validators.common import ApiError, ValidationResult
 from ..validators.courses import (
@@ -53,13 +52,8 @@ def _course(raw, index, expected, context, policy, catalog, candidates, seen, gr
     record["previous_course_status"] = status
     validate_course_catalog(values, catalog, field, result)
     mode, overflow = validate_group_policy(values, policy, field, result)
-    if mode == "strict_remaining":
-        group_policies[group_id] = sum_credit_values((maximum, passed.copy_negate()))
-    elif mode == "approved_overflow":
-        group_policies[group_id] = max(Decimal(0), sum_credit_values((maximum, overflow, passed.copy_negate())))
-    elif mode == "unbounded":
-        # The service computes all available group credits after deduplication.
-        group_policies[group_id] = None
+    if mode in ("strict_remaining", "approved_overflow", "unbounded"):
+        group_policies[group_id] = requirement_group_cap(mode, maximum, passed, overflow)
     if check_candidate_duplicate(record, reason, seen, field):
         result.summary["duplicate_count"] += 1
         return

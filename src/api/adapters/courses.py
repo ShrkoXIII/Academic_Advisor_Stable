@@ -29,7 +29,6 @@ def adapt_courses(request, *, catalog=None):
                 result.add(error)
         result.summary["candidate_count"] = len(candidates)
         rule_values, optional_flag = validate_course_rules(data, rules, policy, result)
-        result.summary["candidate_count"] = len(candidates)
         result.normalized = {"candidates": sorted(candidates, key=lambda row: row["course_id"]),
                              "requirement_group_policies": group_policies, "registration_rules": rule_values,
                              "allow_register_all_optional": optional_flag, "registration_policy": policy}

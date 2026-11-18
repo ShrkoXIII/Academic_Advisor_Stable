@@ -144,3 +144,9 @@
 - Backend payload, two-stage engine, API, and Streamlit tests passed with synthetic fixtures. Full suite finished with 956 passed, 5 failed, and 2 skipped.
 - Production remains blocked by missing approved models, incompatible history bundles, and unverified University Backend payloads.
 - See `docs/reports/STABILIZATION_VERIFICATION_REPORT.md` for changes, test details, and release requirements.
+
+## 2026-11-18 — Safe API and recommendation consolidation
+- Removed the duplicate candidate count and protected root and the unused startup import.
+- Shared course-group and request ID definitions across their consumers to prevent drift.
+- Added parity coverage in `tests/unit/test_two_stage_payloads.py`. The full suite had 970 passes, 2 known failures and 2 skips.
+- The [Phase 3 report](reports/API_RECOMMENDATION_PHASE_3_REPORT.md) lists the affected files and before-and-after checks.

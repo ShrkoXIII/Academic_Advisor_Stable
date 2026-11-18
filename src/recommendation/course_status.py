@@ -16,6 +16,8 @@ SEMANTIC_PREVIOUS_STATUS = {
 CANDIDATE_GROUPS = {
     "NEW": "NEW", "FAILED": "FAILED_RETAKE", "WITHDRAWN": "WITHDRAWN_RETAKE",
 }
+_OTHER_PREVIOUS_GROUP = "OTHER_PREVIOUS"
+VALID_CANDIDATE_GROUPS = {*CANDIDATE_GROUPS.values(), _OTHER_PREVIOUS_GROUP}
 
 
 def normalize_previous_status(value, *, official=False):
@@ -43,4 +45,4 @@ def classify_candidate_status(record):
     if len(statuses) == 2 and statuses[0] != statuses[1]:
         raise ValueError("Conflicting previous_course_status and previous_finish_status meanings.")
     status = statuses[0] if statuses else "UNKNOWN"
-    return status, CANDIDATE_GROUPS.get(status, "OTHER_PREVIOUS")
+    return status, CANDIDATE_GROUPS.get(status, _OTHER_PREVIOUS_GROUP)

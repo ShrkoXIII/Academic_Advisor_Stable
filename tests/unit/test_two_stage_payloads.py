@@ -9,6 +9,8 @@ import pytest
 from pandas.testing import assert_frame_equal
 
 from src.recommendation import inputs
+from src.recommendation.balance_policy import compute_balance_components
+from src.recommendation.constraints import enumerate_feasible_plan_indices
 from tests.unit.recommendation_fixtures import synthetic_candidates, synthetic_snapshot
 
 
@@ -218,6 +220,38 @@ def test_official_classification_does_not_use_marks_or_attempts(semantic, offici
     if official is not None:
         row["previous_finish_status"] = official
     assert prepare(student).candidates.iloc[0].candidate_group == group
+
+
+def test_classified_groups_flow_through_feasibility_and_balance():
+    student, request = payloads()
+    missing_status = {**student["candidates"][1], "course_id": "D"}
+    del missing_status["previous_course_status"]
+    student["candidates"].extend([
+        missing_status, {**missing_status, "course_id": "E", "previous_course_status": "unrecognized"},
+    ])
+    request.update(max_credits=15, allowed_failed_repeat_credits=3, allowed_withdrawn_repeat_credits=3,
+                   requirement_policies=[{"plan_requirement_type_id": "R", "max_credits": 15}])
+
+    prepared = prepare(student, request)
+    candidates = prepared.candidates
+    by_course = candidates.set_index("course_id")
+    assert by_course["candidate_group"].to_dict() == {
+        "A": "FAILED_RETAKE", "B": "NEW", "C": "WITHDRAWN_RETAKE",
+        "D": "OTHER_PREVIOUS", "E": "OTHER_PREVIOUS",
+    }
+    assert by_course.loc[["D", "E"], "previous_course_status"].tolist() == ["UNKNOWN", "UNRESOLVED"]
+    assert list(enumerate_feasible_plan_indices(candidates, prepared.constraints)) == [(0, 1, 2, 3, 4)]
+
+    balance = compute_balance_components(candidates, candidates, part_semester=1)
+    assert balance["failed_retake_credits"] == balance["withdrawn_retake_credits"] == balance["new_credits"] == 3
+    assert balance["other_previous_credits"] == 6
+    assert balance["scope_applicable"] is False
+
+    invalid = candidates.assign(candidate_group="UNKNOWN")
+    with pytest.raises(ValueError, match="Invalid official candidate_group"):
+        list(enumerate_feasible_plan_indices(invalid, prepared.constraints))
+    with pytest.raises(ValueError, match="Balance requires official candidate_group"):
+        compute_balance_components(invalid, candidates, part_semester=1)
 
 
 @pytest.mark.parametrize("semantic,official", [("FAILED", "W"), ("PASSED", "I"), ("NEW", "P"), ("UNKNOWN", "F")])

@@ -79,7 +79,7 @@ class CumulativeHistoryStore:
             raise ValueError("Invalid history update mode.")
         self.root = Path(root).resolve()
         self.legacy_root = Path(legacy_root).resolve() if legacy_root is not None else None
-        protected = [Path(paths.FROZEN_HISTORY_DIR).resolve(), Path(paths.FROZEN_HISTORY_DIR).resolve()]
+        protected = [Path(paths.FROZEN_HISTORY_DIR).resolve()]
         if self.legacy_root is not None:
             protected.append(self.legacy_root)
         if any(_overlap(self.root, old) for old in protected):

@@ -7,10 +7,8 @@ import numpy as np
 import pandas as pd
 
 from src.data.cleaning.cleaning_utils import clean_id
+from .course_status import VALID_CANDIDATE_GROUPS as _CANDIDATE_GROUPS
 from .plan_generation import enumerate_plan_indices, sum_credit_values
-
-
-_CANDIDATE_GROUPS = {"NEW", "FAILED_RETAKE", "WITHDRAWN_RETAKE", "OTHER_PREVIOUS"}
 
 
 def _credit_value(value, field, *, positive=False):

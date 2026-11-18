@@ -4,6 +4,11 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, StrictStr, model_validator
 
+from .validators.common import REQUEST_ID_FIRST_CHAR, REQUEST_ID_NEXT_CHAR
+
+
+_REQUEST_ID_PATTERN = f"^{REQUEST_ID_FIRST_CHAR}{REQUEST_ID_NEXT_CHAR}*$"
+
 
 class Envelope(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -94,12 +99,12 @@ class RecommendationRequest(StudentValidationRequest, RecommendationOptions):
 
 
 class StudentInputRequest(StudentValidationRequest):
-    request_id: StrictStr = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
+    request_id: StrictStr = Field(min_length=1, max_length=128, pattern=_REQUEST_ID_PATTERN)
     recommendation: RecommendationOptions
 
 
 class CoursesInputRequest(CoursesValidationRequest):
-    request_id: StrictStr = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
+    request_id: StrictStr = Field(min_length=1, max_length=128, pattern=_REQUEST_ID_PATTERN)
 
 
 class Finalization(Envelope):

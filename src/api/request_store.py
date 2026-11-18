@@ -21,14 +21,15 @@ from secrets import compare_digest, token_hex
 import sqlite3
 import time
 
-from .validators.common import ApiError, identifier, identity
+from .validators.common import REQUEST_ID_FIRST_CHAR, REQUEST_ID_NEXT_CHAR, ApiError, identifier, identity
 
 
 COMPONENTS = ("student", "courses")
+_REQUEST_ID_PATTERN = f"{REQUEST_ID_FIRST_CHAR}{REQUEST_ID_NEXT_CHAR}{{0,127}}"
 
 
 def validate_request_id(value):
-    if not isinstance(value, str) or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", value) is None:
+    if not isinstance(value, str) or re.fullmatch(_REQUEST_ID_PATTERN, value) is None:
         raise ApiError("INVALID_REQUEST_ID", "A request identifier of 1 to 128 safe characters is required.", field="request_id")
     return value
 

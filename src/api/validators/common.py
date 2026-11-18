@@ -7,6 +7,10 @@ import math
 from src.paths import academic_part
 
 
+REQUEST_ID_FIRST_CHAR = r"[A-Za-z0-9]"
+REQUEST_ID_NEXT_CHAR = r"[A-Za-z0-9_.-]"
+
+
 class ApiError(ValueError):
     def __init__(self, code, message, *, field=None, component="input", status_code=422, details=None):
         self.status_code = status_code

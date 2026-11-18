@@ -167,7 +167,6 @@ class ApiService:
 
     def initialize(self, *, catalog_loader=None, grade_scale_loader=None, history_loader=None, model_loader=None):
         """Load each dependency independently; ordinary load errors leave HTTP usable."""
-        import pandas as pd
         loaders = {"catalog": catalog_loader or load_catalog,
                    "grade_scale": grade_scale_loader or (lambda: GradeScale.from_parquet(paths.GRADE_SCALE_PATH)),
                    "history_manager": history_loader or self._load_history,

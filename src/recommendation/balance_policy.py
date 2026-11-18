@@ -6,7 +6,8 @@ import numpy as np
 import pandas as pd
 
 from src.data.cleaning.cleaning_utils import clean_id
-from .constraints import _CANDIDATE_GROUPS, _credit_value
+from .constraints import _credit_value
+from .course_status import VALID_CANDIDATE_GROUPS as _CANDIDATE_GROUPS
 
 
 @dataclass(frozen=True)

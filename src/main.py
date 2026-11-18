@@ -59,8 +59,6 @@ def _select_steps(args, parser):
         steps = PIPELINE[args.section]
         if args.section in STANDARD_SECTIONS:
             return tuple(step for step in steps if step.standard)
-        if args.section == "recommendation":
-            return (STEPS["recommend"],)
         return steps
     if args.step:
         return (STEPS[args.step],)

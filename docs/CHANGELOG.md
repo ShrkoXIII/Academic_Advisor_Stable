@@ -120,3 +120,27 @@
 - السبب: تثبيت مسار واحد نهائي للتاريخ والتدريب دون تسميات عقد رقمية.
 - التحقق: لم تُشغّل الاختبارات أو مراحل البيانات ضمن هذا التعديل.
 - الملفات: `src/features/`، `src/modeling/`، `src/recommendation/`، `src/api/service.py`، `src/evaluation/`، `models/`، `data/features/`، `data/artifacts/`، `tests/unit/`، `README.md`.
+
+## 2026-11-14 — حذف نماذج بعقود ميزات قديمة
+- حُذفت أوزان 33/47 ميزة وmetadata والـmanifests والفئات المرتبطة بها؛ لم يُجر تدريب جديد.
+- السبب: منع استخدام أصول لا تطابق العقد الحالي 31/43.
+- التحقق: تأكدت إزالة الملفات المحددة؛ لم تُشغّل اختبارات أو تدريب.
+- الملفات: `models/grade_regressor.txt`، `models/fail_risk_classifier.txt`، `models/model_metadata.json`، `models/shortlist/`، `models/shortlist_training/`، `data/artifacts/build_manifest.json`، `data/artifacts/category_levels.json`.
+
+## 2026-11-14 — تنظيف نتائج تدريب النماذج القديمة
+- حُذفت تقارير تحقق ونتائج holdout ومقارنة مرتبطة بنماذج shortlist القديمة.
+- السبب: ترك مخارج التدريب الحالية فارغة قبل تدريب العقود الجديدة لاحقًا.
+- التحقق: مجلد `data/evaluation/shortlist/` لم يعد موجودًا؛ لم يُشغّل تدريب أو اختبار.
+- الملفات: `data/evaluation/shortlist/`.
+
+## 2026-11-17 — Backend-Driven Recommendation Inputs
+- Removed the local-file recommendation adapter from `src/recommendation/inputs.py`; moved registered-course normalization to `src/evaluation/local_course_inputs.py` for observed-plan evaluation.
+- Removed the stale CLI branch and documented the Backend→API→two-stage path and local runtime dependencies in README/docs; clarified request-store use and Streamlit evaluation wording; added regression tests.
+- Validation: payload/UI 69 passed; request-store 48 passed/1 skipped; API adapter/settings 2 passed; CLI rejection 1 passed; constraint/shortlist/ranking 111 passed/5 fixture failures; observed-plan 16 fixture failures; runner 2 passed/1 existing assertion failure.
+- Full suite collected 963 tests but could not finish: API fixtures hit the pre-existing feature-contract mismatch, then Windows AppTest blocked creating `asyncio.socketpair` in the sandbox. No live University Backend integration was available.
+
+## 2026-11-17 — Recommendation Stabilization Verification
+- Restored the canonical feature name, aligned the dry-run assertion with the CLI, and corrected manifest validation while preserving production approval checks.
+- Backend payload, two-stage engine, API, and Streamlit tests passed with synthetic fixtures. Full suite finished with 956 passed, 5 failed, and 2 skipped.
+- Production remains blocked by missing approved models, incompatible history bundles, and unverified University Backend payloads.
+- See `docs/reports/STABILIZATION_VERIFICATION_REPORT.md` for changes, test details, and release requirements.

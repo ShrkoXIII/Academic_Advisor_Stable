@@ -2,6 +2,8 @@
 import sys
 from types import SimpleNamespace
 
+import pytest
+
 import src.main as runner
 
 
@@ -21,7 +23,7 @@ def test_data_order_and_dry_run_never_execute(monkeypatch, capsys):
     assert "src.experiments" not in output
     assert "build_frozen_history" not in output
     assert "publish_artifacts" not in output
-    assert "One canonical Stable pipeline" in output
+    assert "Dry run complete; no pipeline steps executed." in output
 
 
 def test_failure_stops_the_pipeline(monkeypatch):
@@ -34,3 +36,22 @@ def test_failure_stops_the_pipeline(monkeypatch):
     assert len(calls) == 2
     assert calls[0][0][:2] == [sys.executable, "-m"]
     assert calls[0][1]["cwd"] == runner.PROJECT_ROOT
+
+
+def test_recommendation_cli_section_is_rejected_and_not_listed(capsys):
+    assert "recommendation" not in runner.PIPELINE
+    assert "recommend" not in runner.STEPS
+
+    assert runner.main(["--list"]) == 0
+    listed = capsys.readouterr().out
+    assert "recommendation" not in listed
+    assert "recommend" not in listed
+
+    with pytest.raises(SystemExit) as exc_info:
+        runner.main(["--section", "recommendation"])
+
+    assert exc_info.value.code == 2
+    error = capsys.readouterr().err
+    assert "invalid choice" in error
+    assert "recommendation" in error
+    assert "'recommend'" not in error

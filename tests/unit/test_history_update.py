@@ -334,7 +334,7 @@ def test_existing_destination_is_never_overwritten_even_if_incomplete(tmp_path):
     assert hashes(tmp_path) == before
 
 
-def test_latest_valid_load_skips_incomplete_corrupt_and_wrong_version(tmp_path):
+def test_latest_valid_load_skips_incomplete_corrupt_and_cutoff_mismatch(tmp_path):
     module = api()
     save_initial(tmp_path)
     save_initial(tmp_path, part=20251)
@@ -344,6 +344,7 @@ def test_latest_valid_load_skips_incomplete_corrupt_and_wrong_version(tmp_path):
     save_initial(tmp_path, part=20261)
     path = tmp_path / "as_of_20261/metadata.json"
     metadata = json.loads(path.read_text())
+    metadata["source_max_part"] = 20253
     path.write_text(json.dumps(metadata))
     manager = module.FrozenHistoryManager.load(root=tmp_path)
     assert manager.capture(target_part=20262).as_of_part == 20251

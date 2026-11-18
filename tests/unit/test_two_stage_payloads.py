@@ -45,8 +45,6 @@ def test_ready_values_are_preserved_without_io_or_candidate_cap_filtering(monkey
     def forbidden(*args, **kwargs):
         pytest.fail("Backend adapters must not read local files or compute local history")
     monkeypatch.setattr(pd, "read_parquet", forbidden)
-    monkeypatch.setattr(inputs, "normalize_candidates", forbidden)
-    monkeypatch.setattr(inputs, "build_student_snapshot", forbidden)
     result = prepare(student, request)
     assert result.snapshot["prior_fail_credit_ratio"] == .73
     assert result.snapshot["observed_gap_semesters"] == 7
@@ -61,6 +59,14 @@ def test_ready_values_are_preserved_without_io_or_candidate_cap_filtering(monkey
     assert result.request_metadata["allowed_fail_credits"] == 99
     assert result.request_metadata["allowed_pass_position_type"] == "opaque"
     assert (student, request) == before
+
+
+def test_backend_inputs_do_not_expose_local_file_or_evaluation_adapters():
+    for name in (
+        "CandidateImportError", "read_candidate_file", "build_student_snapshot",
+        "validate_snapshot", "load_local_inputs", "normalize_candidates",
+    ):
+        assert not hasattr(inputs, name)
 
 
 @pytest.mark.parametrize("first,second", [(None, 2.7), (3.2, None), (None, None)])

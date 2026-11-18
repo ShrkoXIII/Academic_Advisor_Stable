@@ -83,18 +83,29 @@ def test_lazy_defaults_and_persistent_modes(tmp_path):
 
 
 def test_approved_initialization_preserves_full_weighted_history_and_source(tmp_path):
-    store, baseline, old = initialize(tmp_path)
+    old = tmp_path / "old"
+    baseline, digest = source(old)
+    source_bundle = old / "as_of_20251"
+    original_files = {path.name: path.read_bytes() for path in source_bundle.iterdir()}
+    store = module().CumulativeHistoryStore(tmp_path / "incremental", compatibility_check=lambda state, metadata: True)
+    store.initialize(source_root=old, expected_source_hash=digest,
+                     approval_reference="synthetic-approved-prefix",
+                     cumulative_history_confirmed=True, confirmation=True)
+
     loaded, _, metadata = load_frozen_history(20251, root=store.root)
     assert loaded.global_sums == baseline.global_sums
     assert loaded.global_sums["raw_count"] == 3
     assert loaded.global_sums["effective_support"] == 2.25
     assert metadata["baseline_completeness"] == "admin_attested"
     assert "baseline_approval_reference" not in metadata
-    assert metadata["baseline_source_metadata_sha256"] == file_sha256(old / "as_of_20251/metadata.json")
-    assert metadata["artifact_sha256"]["course_history_state.pkl"] == metadata["new_history_sha256"]
-    assert metadata["baseline_source_history_sha256"] == file_sha256(old / "as_of_20251/course_history_state.pkl")
-    assert metadata["artifact_sha256"]["course_history_state.pkl"] != metadata["baseline_source_history_sha256"]
-    assert store.status()["active_historical_cutoff"] == 20251
+    assert metadata["baseline_source_metadata_sha256"] == file_sha256(source_bundle / "metadata.json")
+    assert metadata["baseline_source_history_sha256"] == file_sha256(source_bundle / "course_history_state.pkl")
+    published_hash = file_sha256(store.root / "as_of_20251/course_history_state.pkl")
+    assert metadata["artifact_sha256"]["course_history_state.pkl"] == metadata["new_history_sha256"] == published_hash
+    status = store.status()
+    assert status["active_historical_cutoff"] == 20251
+    assert status["active_history_sha256"] == published_hash
+    assert original_files == {path.name: path.read_bytes() for path in source_bundle.iterdir()}
     for level in baseline.tables:
         assert_frame_equal(loaded.tables[level], baseline.tables[level])
 

@@ -47,7 +47,7 @@ class ApiService:
         self.history_store = history_store
 
     def _get_request_store(self):
-        """Open request storage only for ingestion; diagnostics stay read-only."""
+        """Open request storage for split intake and request-status lookup."""
         with self._request_store_lock:
             if self._request_store is None:
                 from .request_store import RequestStore

@@ -1,4 +1,4 @@
-"""Focused local recommendation and observed-plan evaluation UI."""
+"""Local UI for API recommendations and optional observed-plan evaluation."""
 from pathlib import Path
 import sys
 

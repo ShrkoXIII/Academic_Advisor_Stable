@@ -6,7 +6,8 @@ import pandas as pd
 from src import paths
 from src.api.schemas import RecommendationRequest
 from src.api.catalog import load_catalog
-from src.recommendation.inputs import _payload_id, _payload_part, normalize_candidates
+from src.evaluation.local_course_inputs import normalize_registered_courses
+from src.recommendation.inputs import _payload_id, _payload_part
 
 
 def combine_request(student_id, degree_id, part_id, cutoff, credits,
@@ -81,7 +82,7 @@ def registered_courses(identity, registration=None):
         columns=["student_id", "course_id", "part_id", "attempt_number"],
         filters=[("student_id", "==", str(identity["student_id"])),
                  ("part_id", "<", int(identity["part_id"]))])
-    normalized, _ = normalize_candidates(supplied, catalog, history, **identity)
+    normalized, _ = normalize_registered_courses(supplied, catalog, history, **identity)
     if len(normalized) != len(supplied):
         raise ValueError("Actual registration contains ambiguous or missing courses.")
     return normalized.to_dict("records")

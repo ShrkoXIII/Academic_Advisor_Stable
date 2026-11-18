@@ -56,7 +56,7 @@ flowchart TD
 
 | رقم | الملف والدالة | التنفيذ الفعلي |
 |---|---|---|
-| 01 | [tools/academic_advisor_streamlit/streamlit_app.py](../tools/academic_advisor_streamlit/streamlit_app.py) `main`؛ [ui_client.py](../tools/academic_advisor_streamlit/ui_client.py)؛ [views.py](../tools/academic_advisor_streamlit/views.py) `combine_request` | إما طلب JSON محلي كامل، أو إدخال الطالب والدرجة والفصل والساعات ثم جلب Student وCourses وHistory من الجامعة وتكوين الطلب بالسياق. رد History البعيد يُفحص بـ`verify_remote_history` فقط؛ لا يُستورد أو يُفعّل للتنبؤ. يحدد الطلب cutoff، والواجهة تفرض `top_k=3`. |
+| 01 | [tools/academic_advisor_streamlit/streamlit_app.py](../tools/academic_advisor_streamlit/streamlit_app.py) `main`؛ [ui_client.py](../tools/academic_advisor_streamlit/ui_client.py)؛ [views.py](../tools/academic_advisor_streamlit/views.py) `combine_request` | إما payload JSON محلي كامل مطابق لعقد API، أو إدخال الطالب والدرجة والفصل والساعات ثم جلب Student وCourses وHistory من الجامعة وتكوين الطلب بالسياق. JSON لا يكيّف ملفات طالب أو مرشحين محلية؛ المرشحون وخصائصهم وأهليتهم من رد Courses. رد History البعيد يُفحص بـ`verify_remote_history` فقط؛ لا يُستورد أو يُفعّل للتنبؤ. يحدد الطلب cutoff، والواجهة تفرض `top_k=3`. |
 | 02 | [src/api/app.py](../src/api/app.py) `create_app` ومسار `POST /api/v1/recommendations`؛ [schemas.py](../src/api/schemas.py) `RecommendationRequest`؛ [service.py](../src/api/service.py) `ApiService.recommend` | يستقبل API الطلب ويتحقق من schema، ثم الطالب والمواد عبر `validate_student`, `validate_courses` والمحوّلات و[validators](../src/api/validators/courses.py). يرفض الأخطاء ونقص مصادر أو حقول لازمة بدل اختراعها. |
 | 03 | [src/api/service.py](../src/api/service.py) `_prepare_recommendation_context`؛ [src/features/frozen_history.py](../src/features/frozen_history.py) `validate_history_selection`؛ [history_update.py](../src/recommendation/history_update.py) `FrozenHistoryManager.capture` | يتحقق من الجاهزية وسبق cutoff التدريب للهدف، ويلتقط نسخة التاريخ المحلية المطلوبة. النمط العادي يشترط الفصل الأكاديمي السابق مباشرة؛ التاريخ الأقدم مسموح فقط في backtesting المفعّل. لا تكفي مطابقة رقم الفصل لإثبات صحة المصدر النهائي خارجيًا. |
 | 04 | [src/api/service.py](../src/api/service.py) `_build_engine_request`؛ [adapters/courses.py](../src/api/adapters/courses.py) | يلتقي مجال الساعات المطلوب مع المجال المؤكد ويعد سياسات المجموعات والإعادات. عند إعطاء مجال يأخذ **الحد الأعلى المتقاطع هدفًا مطابقًا**، لا يجرب كل إجمالي داخل المجال. حدود نوع المتطلب في هذا المسار تُبنى من مجموع ساعات المرشحين؛ حدود مجموعات المتطلبات تستند إلى السياسة المكيّفة. |
@@ -73,7 +73,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
- U[Streamlit: JSON أو Student + Courses] --> Q[تحقق History البعيد فقط إن استُخدم]
+ U[Streamlit: payload API JSON أو Student + Courses من Backend] --> Q[تحقق History البعيد فقط إن استُخدم]
  Q --> API[API: schema وهوية ومدخلات وسياسات]
  API --> H[التقاط Frozen History المحلي وفحص cutoff]
  H --> C[تطبيع المرشحين والقيود]
@@ -83,7 +83,7 @@ flowchart TD
  L --> S2[سياق كل خطة ثم تنبؤ 47]
  S2 --> R[حساب النقاط وGPA والترتيب ثم حتى 3]
  R --> UI[استجابة API وعرض Streamlit]
- UI --> O[اختياري: تنبؤ محلي بمواد الخطة المسجلة 47]
+ UI --> O[اختياري: تقييم محلي منفصل لمواد الخطة المسجلة 47]
  O --> A[إرفاق النتائج النهائية بعد التنبؤ]
  A --> V[مقارنة وصفية؛ لا نتائج فعلية للبدائل]
 ```

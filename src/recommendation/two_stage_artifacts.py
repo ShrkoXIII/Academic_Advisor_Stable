@@ -205,7 +205,7 @@ def validate_archived_provenance(stage, evidence):
 
 def validate_artifact_manifest(manifest):
     """Validate the deployment contract; this does not approve ranking activation."""
-    required = {"stages", "grade_scale", "prediction_contract", "ranking_approval", "ranking_policy"}
+    required = {"stages", "grade_scale", "prediction_contract", "ranking_approval"}
     if not required.issubset(manifest):
         raise ValueError("Incomplete two-stage manifest contract.")
     if manifest["prediction_contract"] != PREDICTION_CONTRACT:

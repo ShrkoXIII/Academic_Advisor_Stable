@@ -1,19 +1,12 @@
-"""Local file adapters and separate, I/O-free Backend-ready payload adapters."""
+"""I/O-free adapters for Backend-ready recommendation payloads."""
 from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
-import json
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-from src.data.cleaning.cleaning_utils import clean_column_names, clean_id, clean_id_columns
-from src.paths import (
-    CLEAN_DEGREE_COURSE_PATH, CLEAN_STUDENT_COURSE_PATH,
-    CLEAN_STUDENT_DIPLOMA_PATH, CLEAN_STUDENT_STATUS_PATH,
-)
-from src.features.temporal_features import add_student_history_features
+from src.data.cleaning.cleaning_utils import clean_id
 from src.data.academic_calendar import is_regular_semester
 
 from .constraints import PlanConstraints, normalize_requirement_policies
@@ -33,168 +26,6 @@ CANDIDATE_COURSE_COLUMNS = [
     "course_id", "course_credits", "attempt_number",
     "plan_requirement_type_id", "plan_year_order", "plan_semester_order", "plan_credits_count",
 ]
-
-
-class CandidateImportError(ValueError):
-    def __init__(self, report):
-        self.report = report
-        super().__init__("Candidate import failed; see import_report.json: " + "; ".join(report["errors"]))
-
-
-def read_candidate_file(path):
-    path = Path(path)
-    if path.suffix.lower() == ".parquet":
-        return pd.read_parquet(path)
-    if path.suffix.lower() == ".json":
-        data = json.loads(path.read_text(encoding="utf-8-sig"))
-        if not isinstance(data, list):
-            raise ValueError("Candidate JSON must be an array of course records.")
-        return pd.DataFrame(data) if data else pd.DataFrame(columns=["course_id", "course_credits"])
-    raise ValueError("Candidate file must be JSON or Parquet.")
-
-
-def normalize_candidates(raw, catalog, course_history, student_id, degree_id, part_id):
-    student_id, degree_id = clean_id(pd.Series([student_id, degree_id])).tolist()
-    rows = clean_column_names(raw)
-    report = {"source_rows": len(rows), "errors": [], "warnings": []}
-    missing = {"course_id", "course_credits"} - set(rows.columns)
-    if missing:
-        report["errors"].append(f"Missing columns: {sorted(missing)}")
-        raise CandidateImportError(report)
-    rows = clean_id_columns(rows, [c for c in ["student_id", "degree_id", "course_id"] if c in rows])
-    if "is_requestable" in rows and "student_id" not in rows:
-        report["errors"].append("A company export with is_requestable must include student_id.")
-    if "student_id" in rows:
-        rows = rows[rows.student_id.eq(student_id)].copy()
-    if "is_requestable" in rows:
-        rows = rows[rows.is_requestable.astype("string").str.strip().str.upper().eq("Y")].copy()
-    report["selected_rows"] = len(rows)
-    report["filtered_rows"] = report["source_rows"] - len(rows)
-    if "degree_id" in rows and rows.degree_id.ne(degree_id).fillna(True).any():
-        report["errors"].append("Selected rows contain a missing or different degree_id.")
-    if "part_id" in rows:
-        parts = pd.to_numeric(rows.part_id, errors="coerce")
-        if (rows.part_id.notna() & (parts.isna() | parts.ne(int(part_id)))).any():
-            report["errors"].append("Selected rows contain another semester; supply a target-specific list.")
-        if parts.isna().any():
-            report["warnings"].append("Null part_id rows use the explicitly supplied target semester.")
-    rows["course_credits"] = pd.to_numeric(rows.course_credits, errors="coerce")
-    if (~np.isfinite(rows.course_credits.astype(float)) | rows.course_credits.lt(0)).any():
-        report["errors"].append("Course credits must be finite and nonnegative.")
-    if rows.course_id.isna().any() or rows.course_id.eq("").any():
-        report["errors"].append("Missing course_id.")
-    # Ignore request-row IDs when identifying duplicate courses, but report every removal.
-    report["duplicate_course_ids"] = rows.loc[rows.course_id.duplicated(keep=False), "course_id"].drop_duplicates().tolist()
-    comparison = [c for c in ["course_credits", "course_type_id", "requirement_type_id", "year_order", "semester_order"] if c in rows]
-    for course_id, group in rows[rows.course_id.duplicated(keep=False)].groupby("course_id"):
-        if any(group[c].nunique(dropna=False) > 1 for c in comparison):
-            report["errors"].append(f"Conflicting duplicate course: {course_id}")
-    report["duplicate_rows_removed"] = int(rows.course_id.duplicated().sum())
-    rows = rows.drop_duplicates("course_id").copy()
-    name_column = next((c for c in ["course_name_sl", "course_name"] if c in rows), None)
-    rows["provided_name"] = rows[name_column] if name_column else pd.Series(None, index=rows.index, dtype="string")
-    rows = rows[["course_id", "course_credits", "provided_name"]]
-    catalog = clean_id_columns(catalog, ["degree_id", "course_id"])
-    catalog = catalog[catalog.degree_id.eq(degree_id)].copy()
-    if catalog.course_id.duplicated().any():
-        report["errors"].append("Degree catalog has duplicate course keys.")
-    if report["errors"]:
-        raise CandidateImportError(report)
-    catalog = catalog.rename(columns={
-        "course_credits": "catalog_credits", "course_name_sl": "catalog_name",
-        "requirement_type_id": "plan_requirement_type_id",
-        "year_order": "plan_year_order", "semester_order": "plan_semester_order",
-        "credits_count": "plan_credits_count",
-    })
-    cols = ["course_id", "catalog_credits", "catalog_name",
-            "plan_requirement_type_id", "plan_year_order", "plan_semester_order", "plan_credits_count"]
-    rows = rows.merge(catalog[cols], on="course_id", how="left", validate="one_to_one", indicator=True)
-    report["unmatched_course_ids"] = rows.loc[rows._merge.eq("left_only"), "course_id"].tolist()
-    conflict = rows._merge.eq("both") & rows.course_credits.ne(pd.to_numeric(rows.catalog_credits))
-    report["credit_conflicts"] = rows.loc[conflict, ["course_id", "course_credits", "catalog_credits"]].to_dict("records")
-    if report["unmatched_course_ids"]:
-        report["errors"].append("Courses missing from the selected degree catalog.")
-    if report["credit_conflicts"]:
-        report["errors"].append("Supplied credits conflict with the degree catalog.")
-    if report["errors"]:
-        raise CandidateImportError(report)
-    # Match training's attempt semantics (cleaned GPA-bearing attempts across degrees).
-    history = clean_id_columns(course_history, ["student_id", "course_id"])
-    prior = history[history.student_id.eq(student_id) & history.part_id.lt(int(part_id))]
-    attempts = prior.groupby("course_id").attempt_number.max()
-    rows["attempt_number"] = rows.course_id.map(attempts).fillna(0).astype("int64") + 1
-    rows["course_name"] = rows.provided_name.combine_first(rows.catalog_name).astype("string")
-    rows = rows.drop(columns=["provided_name", "catalog_name", "catalog_credits", "_merge"])
-    report["candidate_count"] = len(rows)
-    report["history_latest_part"] = int(prior.part_id.max()) if len(prior) else None
-    return rows.sort_values("course_id", kind="stable").reset_index(drop=True), report
-
-
-def build_student_snapshot(status, course_history, diplomas, student_id, degree_id, part_id):
-    """Use the exact target's start fields and shifted prior history, never end fields."""
-    student_id, degree_id = clean_id(pd.Series([student_id, degree_id])).tolist()
-    status = status[status.student_id.eq(student_id) & status.part_id.le(int(part_id))].copy()
-    target = status[status.degree_id.eq(degree_id) & status.part_id.eq(int(part_id))]
-    if len(target) != 1:
-        raise ValueError("No unique target-semester status. Supply a complete --snapshot JSON.")
-    lookup, _ = add_student_history_features(
-        target[["student_status_id"]], target[["student_status_id"]].iloc[:0], status,
-    )
-    snapshot = target.iloc[0].to_dict()
-    snapshot.update(lookup.iloc[0].to_dict())
-    prior = course_history[course_history.student_id.eq(student_id)
-                           & course_history.degree_id.eq(degree_id)
-                           & course_history.part_id.lt(int(part_id))]
-    faculties = prior.faculty_id.dropna().unique()
-    diploma = diplomas[diplomas.student_id.eq(student_id)]
-    if len(faculties) != 1 or len(diploma) != 1:
-        raise ValueError("Missing/ambiguous faculty or diploma data. Supply --snapshot JSON.")
-    snapshot.update(diploma.iloc[0].to_dict())
-    snapshot["faculty_id"] = faculties[0]
-    columns = [*STUDENT_SNAPSHOT_COLUMNS, "part_id"]
-    # Preserve an explicitly supplied GPA denominator without deriving it from
-    # either registered credits or completed credits.
-    if "current_gpa_credits" in snapshot:
-        columns.append("current_gpa_credits")
-    return {c: snapshot[c] for c in columns}
-
-
-def validate_snapshot(snapshot, student_id, degree_id, part_id):
-    frame = clean_column_names(pd.DataFrame([snapshot]))
-    required = [*STUDENT_SNAPSHOT_COLUMNS, "part_id"]
-    missing = set(required) - set(frame.columns)
-    if missing:
-        raise ValueError(f"Incomplete snapshot; missing {sorted(missing)}")
-    frame = clean_id_columns(frame, ["student_id", "degree_id", "faculty_id", "grade_version_id", "diploma_type_id"])
-    if frame[["student_id", "degree_id", "part_id"]].isna().any().any():
-        raise ValueError("Snapshot student, degree and semester must be present.")
-    snapshot = frame.iloc[0].to_dict()
-    ids = clean_id(pd.Series([student_id, degree_id])).tolist()
-    if [snapshot["student_id"], snapshot["degree_id"]] != ids or float(snapshot["part_id"]) != int(part_id):
-        raise ValueError("Snapshot student, degree or semester does not match the request.")
-    # Explicit null histories remain unknown, not fabricated zero histories.
-    # This serving-only field is never added to the model feature contract.
-    optional = ["current_gpa_credits"] if "current_gpa_credits" in snapshot else []
-    return {c: snapshot[c] for c in [*required, *optional]}
-
-
-def load_local_inputs(candidate_path, student_id, degree_id, part_id, snapshot_path=None):
-    # This common-student table retains the cleaner's cross-degree attempt
-    # numbers and GPA-bearing outcomes, before model-specific outcome filters.
-    history = pd.read_parquet(CLEAN_STUDENT_COURSE_PATH)
-    candidates, report = normalize_candidates(
-        read_candidate_file(candidate_path), pd.read_parquet(CLEAN_DEGREE_COURSE_PATH),
-        history, student_id, degree_id, part_id,
-    )
-    if snapshot_path:
-        snapshot = json.loads(Path(snapshot_path).read_text(encoding="utf-8-sig"))
-    else:
-        # Common-student filtering preserves all cleaned status semesters;
-        # this is also the official feature builder's student-history source.
-        status = pd.read_parquet(CLEAN_STUDENT_STATUS_PATH)
-        snapshot = build_student_snapshot(status, history, pd.read_parquet(CLEAN_STUDENT_DIPLOMA_PATH),
-                                          student_id, degree_id, part_id)
-    return candidates, validate_snapshot(snapshot, student_id, degree_id, part_id), report
 
 
 # Core mapping schema only; transport/HTTP contracts remain outside Phase 2.
@@ -275,7 +106,7 @@ def normalize_student_payload(snapshot, *, student_id, degree_id, part_id):
                                 nullable=key not in {"current_gpa_credits", "start_agpa_points"},
                                 nonnegative=True)
         result[key] = float(value)
-    if not 0 <= result["start_agpa_points"] <= 4:
+    if not 0 <= result["start_agpa_points"] <= 4:   
         raise ValueError("start_agpa_points must be between 0 and 4.")
     result["part_id"] = part_id
     result["part_semester"] = part_id % 10

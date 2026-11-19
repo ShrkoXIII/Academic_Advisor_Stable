@@ -6,7 +6,7 @@ import pandas as pd
 
 from .balance_policy import compute_balance_components
 from .constraints import enumerate_feasible_plan_indices
-from .plan_scoring import SUMMARY_COLUMNS, project_cumulative_gpa
+from .plan_scoring import SUMMARY_COLUMNS, derive_plan_gpa_metrics
 from .ranking import RankingStrategy, canonical_plan_identity, rank_evaluation_plans
 
 
@@ -39,17 +39,16 @@ def build_stage1_shortlist(scored_candidates, constraints, *, stage1_shortlist_s
                             for c, p in zip(selected.course_credits, selected.expected_points)))
         failed = float(sum(Fraction(str(c)) * Fraction(str(p))
                            for c, p in zip(selected.course_credits, selected.fail_probability)))
-        projected = float(project_cumulative_gpa(current_gpa, current_gpa_credits, quality, credits))
+        gpa_metrics = derive_plan_gpa_metrics(current_gpa, current_gpa_credits, quality, credits)
+        legacy_gain = gpa_metrics.pop("gpa_gain")
         records.append({
             "plan_id": identity.plan_id, "course_tuple": identity.course_tuple,
             "course_count": len(selected), **balance,
             "expected_quality_points": quality, "expected_failed_credits": failed,
-            "expected_plan_gpa": quality / credits, "projected_cumulative_gpa": projected,
-            "expected_cumulative_gpa_gain": projected - current_gpa,
-            "is_expected_cumulative_improvement": projected > current_gpa,
+            **gpa_metrics,
             "projected_gpa_requires_repeat_policy": bool(selected.attempt_number.gt(1).any()
                 or selected.candidate_group.ne("NEW").any()),
-            "gpa_gain": quality / credits - current_gpa,
+            "gpa_gain": legacy_gain,
         })
         indices_by_id[identity.plan_id] = indices
     if records:

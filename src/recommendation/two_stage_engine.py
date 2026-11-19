@@ -20,9 +20,10 @@ from .balance_policy import B_OBSERVED_MIDDLE_V1
 from .history_update import FrozenHistoryManager
 from .inputs import prepare_recommendation_payloads
 from .plan_generation import build_plan_rows
-from .plan_scoring import COURSE_OUTPUT_COLUMNS, SUMMARY_COLUMNS, score_course_rows, summarize_scored_plans
+from .plan_scoring import COURSE_OUTPUT_COLUMNS, SUMMARY_COLUMNS, aggregate_scored_plans, score_course_rows
 from .ranking import RankingStrategy, rank_evaluation_plans
 from .ranking_policy import UNAPPROVED_RANKING, validate_ranking_policy
+from .serving import pin_serving_history
 from .shortlist import SHORTLIST_LIMIT, build_stage1_shortlist
 from .two_stage_artifacts import TwoStageArtifacts, load_two_stage_artifacts, stage_feature_contract
 
@@ -182,6 +183,14 @@ class TwoStagePlanRecommender:
     def recommend_from_payloads(self, *, student_payload, request_payload, top_k=3,
                                history_as_of_part=None, allow_older_history=None):
         """Return Stage 2 Top K inside the explicit Stage 1 shortlist, never global."""
+        return self._recommend_from_payloads(
+            student_payload=student_payload, request_payload=request_payload, top_k=top_k,
+            history_as_of_part=history_as_of_part, allow_older_history=allow_older_history,
+        )
+
+    def _recommend_from_payloads(self, *, student_payload, request_payload, top_k,
+                                history_as_of_part=None, allow_older_history=None, pinned_history=None):
+        """Score using the verified history already pinned by serving, if supplied."""
         if isinstance(top_k, (bool, np.bool_)) or not isinstance(top_k, (int, np.integer)) or not 1 <= top_k <= SHORTLIST_LIMIT:
             raise ValueError("top_k must be an integer in 1..50.")
         top_k = int(top_k)
@@ -195,11 +204,10 @@ class TwoStagePlanRecommender:
         if any(entry["training_as_of_part"] >= target for entry in self._manifest["stages"].values()):
             raise ValueError("Model training cutoff must precede the target semester.")
         input_sha256 = _input_fingerprint(prepared, top_k)
-        if history_as_of_part is None and allow_older_history is None:
-            history = self.history_manager.capture(target_part=target)
-        else:
-            history = self.history_manager.capture(target_part=target, history_as_of_part=history_as_of_part,
-                                                   allow_older_history=allow_older_history)
+        if pinned_history is None:
+            pinned_history = pin_serving_history(self.history_manager, target_part=target,
+                                                 history_as_of_part=history_as_of_part, allow_older_history=allow_older_history)
+        history = pinned_history.snapshot
         history_metadata = history.metadata_for_target(target)
         base = self._prepare_candidates(prepared, history)
         shortlist_ids, feasible_count, stage2_count = [], 0, 0
@@ -223,7 +231,7 @@ class TwoStagePlanRecommender:
                 rows["plan_id"] = rows.plan_id.map(dict(enumerate(shortlist_ids)))
                 scored = self._score_stage2(rows)
                 stage2_count = len(scored)
-                summary = summarize_scored_plans(scored, snapshot["start_agpa_points"], snapshot["current_gpa_credits"])
+                summary = aggregate_scored_plans(scored, snapshot["start_agpa_points"], snapshot["current_gpa_credits"])
                 # Carry Balance/identity only; no Stage 1 prediction enters Final.
                 balance_columns = [c for c in selection.shortlist if c not in SUMMARY_COLUMNS
                                    and c not in {"stage1_projected_cumulative_gpa", "pareto_front"}]
@@ -240,7 +248,7 @@ class TwoStagePlanRecommender:
             **ranking_metadata,
             "student_id": snapshot["student_id"], "degree_id": snapshot["degree_id"], "part_id": target,
             "input_fingerprint_version": "normalized_payload_v1", "input_sha256": input_sha256,
-            "history": history_metadata, "skipped_history_bundles": deepcopy(self.history_manager.skipped_bundles),
+            "history": history_metadata, "skipped_history_bundles": pinned_history.skipped_bundles,
             "models": {stage: {"models": entry["models"], "category_levels": {
                 key: entry["category_levels"][key] for key in ("path", "sha256")},
                 "training_as_of_part": entry["training_as_of_part"], "feature_contract": entry["feature_contract"]}

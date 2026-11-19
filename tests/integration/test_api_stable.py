@@ -1,5 +1,8 @@
 """HTTP contract coverage with generated identities and synthetic two-stage models."""
+from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
+from threading import Event
+from types import SimpleNamespace
 
 import pandas as pd
 import pytest
@@ -10,6 +13,7 @@ from src.api.app import create_app
 from src.api.service import ApiService
 from src.api.settings import ApiSettings
 from src.grade_scale import GradeScale
+from src.recommendation.cumulative_history import CumulativeHistoryStore
 from src.recommendation.two_stage_engine import TwoStagePlanRecommender
 from tests.synthetic_api import sample_catalog, sample_request
 from tests.unit.test_cumulative_history import payload as history_delta, source as cumulative_source
@@ -472,3 +476,98 @@ def test_http_finalization_requires_its_credential_and_auto_mode(api_client, ini
     assert status["active_history_sha256"] == response.json()["new_history_sha256"]
     assert status["active_history_sha256"] != initialized_history
     assert status["pending_delta"] is None
+
+
+def test_http_request_keeps_the_same_history_after_cross_worker_rollback(
+    api_client, initialized_history, tmp_path, monkeypatch,
+):
+    client, engine, request = api_client
+    api = client.app.state.api_service
+    store = api.history_store
+    delta = history_delta()
+    preview = store.preview(history_payload=delta)
+    committed = store.commit(history_payload=delta, preview_token=preview["preview_token"],
+                             confirmation=True, approval_reference="synthetic-finalized-20252")
+    store.activate(cutoff=20252, expected_history_sha256=committed["new_history_sha256"], confirmation=True)
+    other_worker = CumulativeHistoryStore(tmp_path / "updates", compatibility_check=api._history_compatibility,
+                                          legacy_root=tmp_path / "baseline")
+    request = request_for_history(request, target=20253, cutoff=20252)
+    engine.artifacts.stage2.grade_model.value = lambda matrix: matrix["course_history_avg_mark"]
+    before = post(client, request)
+    assert before.status_code == 200, before.json()
+
+    captured, resume = Event(), Event()
+    real_capture = store.capture
+    cutoffs = []
+
+    def pause_after_capture(**kwargs):
+        snapshot = real_capture(**kwargs)
+        cutoffs.append(snapshot.as_of_part)
+        if len(cutoffs) == 1:
+            captured.set()
+            assert resume.wait(15)
+        return snapshot
+
+    monkeypatch.setattr(store, "capture", pause_after_capture)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        pending = pool.submit(post, client, request)
+        try:
+            assert captured.wait(15)
+            other_worker.activate(cutoff=20251, expected_history_sha256=initialized_history,
+                                  confirmation=True, rollback=True)
+        finally:
+            resume.set()
+        response = pending.result(timeout=15)
+
+    assert response.status_code == 200, response.json()
+    assert response.json() == before.json()
+    assert cutoffs == [20252]
+    rejected = post(client, request)
+    assert rejected.status_code == 503
+    assert rejected.json()["error"]["code"] == "HISTORY_UNAVAILABLE"
+
+
+def test_http_preserves_inference_and_history_operation_busy_errors(api_client):
+    client, engine, request = api_client
+    scoring, resume = Event(), Event()
+
+    def wait_for_other_calls(matrix):
+        scoring.set()
+        assert resume.wait(15)
+        return matrix["course_credits"] * 0 + 90
+
+    engine.artifacts.stage1.grade_model.value = wait_for_other_calls
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        pending = pool.submit(post, client, request)
+        try:
+            assert scoring.wait(15)
+            rejected = post(client, request)
+            assert rejected.status_code == 503
+            assert rejected.json()["error"]["code"] == "INFERENCE_BUSY"
+            rejected = client.post(f"{HISTORY_ADMIN}/preview", json=history_event(), headers=ADMIN_HEADERS)
+            assert rejected.status_code == 503
+            assert rejected.json()["error"]["code"] == "HISTORY_OPERATION_BUSY"
+        finally:
+            resume.set()
+        response = pending.result(timeout=15)
+    assert response.status_code == 200, response.json()
+
+
+def test_http_preserves_the_public_call_for_an_injected_engine(api_client):
+    client, engine, request = api_client
+    api = client.app.state.api_service
+    expected = post(client, request)
+    assert expected.status_code == 200
+    seen = []
+
+    def recommend(**options):
+        seen.append((options["history_as_of_part"], options["allow_older_history"]))
+        return engine.recommend_from_payloads(**options)
+
+    api.engine = SimpleNamespace(recommend_from_payloads=recommend)
+    api.history_manager = SimpleNamespace(capture=engine.history_manager.capture)
+    response = post(client, request)
+
+    assert response.status_code == 200, response.json()
+    assert response.json() == expected.json()
+    assert seen == [(20243, False)]

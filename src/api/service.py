@@ -5,8 +5,10 @@ from src import paths
 from src.features.frozen_history import validate_history_selection
 from src.grade_scale import GradeScale
 from src.recommendation.history_update import FrozenHistoryManager
-from src.recommendation.ranking_policy import validate_ranking_policy
 from src.recommendation.registration_policy import candidate_credit_caps, intersect_credit_bounds
+from src.recommendation.serving import (
+    pin_serving_history, validate_pareto_serving_policy, validate_serving_history_compatibility,
+)
 from src.recommendation.two_stage_artifacts import load_two_stage_artifacts
 from src.recommendation.two_stage_engine import TwoStagePlanRecommender
 
@@ -130,23 +132,11 @@ class ApiService:
 
     def _history_compatibility(self, state, metadata):
         """Loaded artifacts retain their original manifest and approval validation."""
-        if self.artifacts is None:
-            raise ValueError("SERVING_ARTIFACTS_UNAVAILABLE")
-        policy = validate_ranking_policy(self.artifacts.manifest, require_approved=True)
-        if any(policy[key] != {"name": "pareto", "version": "v1"} for key in
-               ("stage1_shortlist_strategy", "final_ranking_strategy")):
-            raise ValueError("SERVING_POLICY_INCOMPATIBLE")
-        for stage in self.artifacts.manifest["stages"].values():
-            columns = stage["feature_contract"]["model_features"]
-            if any("specialty_history" in column or "degree_history" in column for column in columns):
-                raise ValueError("SPECIALTY_HISTORY_AGGREGATES_UNAVAILABLE")
-        if state.as_of_part != metadata.get("as_of_part"):
-            raise ValueError("SERVING_HISTORY_INCOMPATIBLE")
+        validate_serving_history_compatibility(self.artifacts, state, metadata)
 
     def _load_history(self):
-        if self.history_store.status().get("active_as_of_part") is not None:
-            return self.history_store.serving_manager()
-        return FrozenHistoryManager.load()
+        manager = self.history_store.serving_manager()
+        return FrozenHistoryManager.load() if manager is None else manager
 
     def _bind_history_manager(self, manager):
         self.history_manager = manager
@@ -175,10 +165,7 @@ class ApiService:
                 try:
                     value = loader()
                     if name == "artifacts":
-                        policy = validate_ranking_policy(value.manifest, require_approved=True)
-                        if any(policy[key] != {"name": "pareto", "version": "v1"} for key in
-                               ("stage1_shortlist_strategy", "final_ranking_strategy")):
-                            raise ValueError("API requires the approved pareto v1 policy at both stages.")
+                        validate_pareto_serving_policy(value)
                     setattr(self, name, value)
                 except Exception:
                     # Never expose loader errors, private artifact paths or input data.
@@ -199,9 +186,11 @@ class ApiService:
                 "history_readiness": {"ready": history_ready},
                 "catalog_readiness": {"ready": self.catalog is not None},
                 "grade_scale_readiness": {"ready": self.grade_scale is not None},
-                "recommendation_readiness": {"ready": history_ready and all(value is not None for value in
-                    (self.engine, self.catalog, self.grade_scale))},
+                "recommendation_readiness": {"ready": self._recommendation_ready(history_ready)},
                 "production_operational_limits": "UNRESOLVED"}
+
+    def _recommendation_ready(self, history_ready):
+        return history_ready and all(value is not None for value in (self.engine, self.catalog, self.grade_scale))
 
     def validate_student(self, request):
         return adapt_student(request, settings=self.settings, grade_scale=self.grade_scale)
@@ -296,9 +285,9 @@ class ApiService:
     def recommend(self, request):
         """Validate and prepare PHP inputs, run inference, then expose safe output."""
         student, courses = self._validate_recommendation_inputs(request)
-        cutoff, target, mode, candidates = self._prepare_recommendation_context(request, student, courses)
+        cutoff, target, mode, candidates, history = self._prepare_recommendation_context(request, student, courses)
         engine_request = self._build_engine_request(request, courses, candidates, target)
-        output = self._run_recommendation(student, candidates, engine_request, request, cutoff, mode)
+        output = self._run_recommendation(student, candidates, engine_request, request, cutoff, mode, history)
         return self._recommendation_response(output, student, courses, target, cutoff, mode)
 
     def _validate_recommendation_inputs(self, request):
@@ -326,7 +315,8 @@ class ApiService:
         if (self.settings.performance_test_mode and
                 len(candidates) > self.settings.performance_test_max_candidates):
             raise ApiError("PERFORMANCE_TEST_LIMIT", "Entire request exceeds the configured performance test limit.")
-        if not self.health()["recommendation_readiness"]["ready"]:
+        manager = self.history_manager
+        if not self._recommendation_ready(manager is not None):
             raise ApiError("DEPENDENCY_UNAVAILABLE", "Recommendation dependencies are unavailable.", status_code=503)
         # Unknown histories are retained only where the existing snapshot contract
         # permits null; no totals or GPA lags are invented here.
@@ -336,10 +326,11 @@ class ApiService:
             if target <= part(stage["training_as_of_part"]):
                 raise ApiError("TRAINING_CUTOFF_OVERLAP", "Target must follow every model training cutoff.")
         try:
-            self.history_manager.capture(target_part=target, history_as_of_part=cutoff, allow_older_history=mode == "backtesting")
+            history = pin_serving_history(manager, target_part=target, history_as_of_part=cutoff,
+                                          allow_older_history=mode == "backtesting")
         except (ValueError, OSError):
             raise ApiError("HISTORY_UNAVAILABLE", "The exact requested history snapshot is unavailable or incompatible.", status_code=503) from None
-        return cutoff, target, mode, candidates
+        return cutoff, target, mode, candidates, history
 
     def _build_engine_request(self, request, courses, candidates, target):
         """Intersect confirmed credit bounds and prepare exact plan constraints."""
@@ -373,14 +364,20 @@ class ApiService:
             engine_request.pop("allowed_withdrawn_repeat_credits")
         return engine_request
 
-    def _run_recommendation(self, student, candidates, engine_request, request, cutoff, mode): ## send to engine
+    def _run_recommendation(self, student, candidates, engine_request, request, cutoff, mode, history):
         """Protect the existing engine call with the serving-worker lock."""
         if not self._inference_lock.acquire(blocking=False):
             raise ApiError("INFERENCE_BUSY", "Recommendation worker is busy.", status_code=503)
         try:
-            output = self.engine.recommend_from_payloads(student_payload={"snapshot": student.normalized, "candidates": candidates},
-                        request_payload=engine_request, top_k=request.get("top_k", 3), history_as_of_part=cutoff,
-                        allow_older_history=mode == "backtesting")
+            engine = self.engine
+            recommend = engine.recommend_from_payloads
+            options = {"student_payload": {"snapshot": student.normalized, "candidates": candidates},
+                       "request_payload": engine_request, "top_k": request.get("top_k", 3)}
+            if (isinstance(engine, TwoStagePlanRecommender)
+                    and getattr(recommend, "__func__", None) is TwoStagePlanRecommender.recommend_from_payloads):
+                output = engine._recommend_from_payloads(**options, pinned_history=history)
+            else:
+                output = recommend(**options, history_as_of_part=cutoff, allow_older_history=mode == "backtesting")
         except ValueError:
             raise ApiError("INCOMPATIBLE_INPUTS", "Prepared inputs do not satisfy the inference contract.") from None
         finally:

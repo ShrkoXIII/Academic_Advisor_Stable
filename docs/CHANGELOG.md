@@ -162,3 +162,15 @@
 - Delegated failed-credit ratio and enrollment-gap calculations from `src/api/adapters/student.py` while retaining source evidence checks.
 - Added nine cases in `tests/unit/test_student_snapshot_parity.py` and matched before-and-after responses for 13 synthetic student scenarios.
 - All 26 HTTP cases passed. The full suite had 990 passes, 2 known frozen-history filename failures and 2 skips.
+
+## 2026-11-18 — Phase 5 scoring and ranking separation
+- Split aggregation from the legacy sorted summary in `src/recommendation/plan_scoring.py`. `src/recommendation/two_stage_engine.py` uses aggregation before final ranking.
+- Shared GPA metrics in `src/recommendation/shortlist.py` and the final scorer while preserving each stage's weighted totals.
+- Added three checks in `tests/unit/test_plan_scoring.py`. Synthetic recommendation and observed-plan outputs matched before and after.
+- Passed 200 focused and 26 HTTP cases. The full suite had 993 passes, 2 known frozen-history filename failures and 2 skips.
+
+## 2026-11-18 — Phase 6 readiness and frozen history selection
+- Shared Pareto and history compatibility checks in `src/recommendation/serving.py` and consolidated readiness in `src/api/service.py`.
+- Passed one verified history snapshot per built-in engine request into `src/recommendation/two_stage_engine.py`, preserving the public injected-engine call.
+- Added rollback, busy-worker and injected-engine checks in `tests/integration/test_api_stable.py`. All 16 before-and-after serving scenarios matched.
+- All 29 HTTP tests passed. The full suite had 996 passes, 2 known frozen-history filename failures and 2 skips.

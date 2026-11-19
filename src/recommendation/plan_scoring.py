@@ -67,7 +67,26 @@ def project_cumulative_gpa(current_gpa, current_gpa_credits, expected_quality_po
     return (gpa * credits + quality) / (credits + plan_credits)
 
 
-def summarize_scored_plans(scored_courses, current_gpa, current_gpa_credits):
+def derive_plan_gpa_metrics(current_gpa, current_gpa_credits, quality_points, total_credits):
+    """Derive GPA metrics from either one plan's totals or aligned plan columns."""
+    projected = project_cumulative_gpa(current_gpa, current_gpa_credits, quality_points, total_credits)
+    if isinstance(quality_points, pd.Series):
+        projected = pd.Series(projected, index=quality_points.index)
+    else:
+        projected = float(projected)
+    plan_gpa = quality_points / total_credits
+    return {
+        "expected_plan_gpa": plan_gpa,
+        "projected_cumulative_gpa": projected,
+        "expected_cumulative_gpa_gain": projected - current_gpa,
+        "is_expected_cumulative_improvement": projected > current_gpa,
+        # The legacy gain is relative to plan GPA.
+        "gpa_gain": plan_gpa - current_gpa,
+    }
+
+
+def aggregate_scored_plans(scored_courses, current_gpa, current_gpa_credits):
+    """Aggregate scored course rows in first-seen plan order."""
     work = scored_courses.assign(
         quality=scored_courses["course_credits"] * scored_courses["expected_points"],
         failed=scored_courses["course_credits"] * scored_courses["fail_probability"],
@@ -76,18 +95,18 @@ def summarize_scored_plans(scored_courses, current_gpa, current_gpa_credits):
         course_count=("course_id", "size"), total_credits=("course_credits", "sum"),
         expected_quality_points=("quality", "sum"), expected_failed_credits=("failed", "sum"),
     ).reset_index()
-    summary["expected_plan_gpa"] = summary["expected_quality_points"] / summary["total_credits"]
-    summary["projected_cumulative_gpa"] = project_cumulative_gpa(
+    summary = summary.assign(**derive_plan_gpa_metrics(
         current_gpa, current_gpa_credits, summary["expected_quality_points"], summary["total_credits"],
-    )
-    summary["expected_cumulative_gpa_gain"] = summary["projected_cumulative_gpa"] - current_gpa
-    summary["is_expected_cumulative_improvement"] = summary["projected_cumulative_gpa"].gt(current_gpa)
+    ))
     # Observed prior attempts are a conservative warning, not a replacement rule.
     repeat = work["attempt_number"].gt(1).groupby(work["plan_id"]).any()
     summary["projected_gpa_requires_repeat_policy"] = summary["plan_id"].map(repeat).astype("bool")
-    # Legacy field retained ONLY as the semester-GPA gap; it is not the objective.
-    summary["gpa_gain"] = summary["expected_plan_gpa"] - current_gpa
-    return rank_plans(summary[SUMMARY_COLUMNS])
+    return summary[SUMMARY_COLUMNS]
+
+
+def summarize_scored_plans(scored_courses, current_gpa, current_gpa_credits):
+    """Return the legacy summary ordered by its academic ranking."""
+    return rank_plans(aggregate_scored_plans(scored_courses, current_gpa, current_gpa_credits))
 
 
 def empty_summaries():

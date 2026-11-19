@@ -73,8 +73,8 @@ Data: clean_degree_course → clean_student_course → clean_student_status
     → clean_student_diploma → clean_outliers → build_temporal_split
     → build_registration_roster
 Features: temporal outcomes + registration rosters → temporal features
-Modeling: 47-feature grade/fail → 33-feature grade/fail
-Evaluation: observed-plan GPA from test features and the 47-feature grade model
+Modeling: 43-feature grade/fail → 31-feature grade/fail
+Evaluation: observed-plan GPA from test features and the 43-feature grade model
 
 Explicit serving preparation:
     Temporal features → Frozen history by finalized cutoff
@@ -91,8 +91,8 @@ Explicit serving preparation:
 | `data/temporal/` | التدريب والاختبار ونسختا الـroster |
 | `data/features/` | ميزات التدريب والاختبار |
 | `data/artifacts/history/as_of_*/` | حزم تاريخ ثابتة ومتحقق منها |
-| `models/` | زوج 47 وmetadata؛ `shortlist_training/` ناتج تدريب 33 الجديد، و`shortlist/` الحزمة المنشورة |
-| `data/artifacts/category_levels.json` | ترتيب فئات زوج 47 |
+| `models/` | زوج 43 ميزة وmetadata؛ `shortlist_training/` ناتج تدريب زوج 31 ميزة، و`shortlist/` الحزمة المنشورة |
+| `data/artifacts/category_levels.json` | ترتيب فئات زوج 43 ميزة |
 | `data/evaluation/` | تنبؤات ومقاييس التقييم الجديدة |
 | `.api-state/` | SQLite للطلبات المنفصلة؛ ليست جزءًا من بيانات التدريب |
 
@@ -106,7 +106,7 @@ Explicit serving preparation:
 
 ## النماذج والتاريخ
 
-Stage 1 يستعمل 33 ميزة لتقييم كل مرشح، ثم يجمع الخطط الصالحة بالساعات المطلوبة بالضبط ويحتفظ بما يصل إلى 50 خطة. Stage 2 يعيد حساب 14 ميزة للخطة والمقررات الأخرى، ويستعمل عقد 47 ميزة لإعادة التقييم والترتيب. الناتج أربعة نماذج: علامة ورسوب لكل مرحلة. لا يضمن المسار أفضل Top-K عالميًا.
+Stage 1 يستعمل 31 ميزة لتقييم كل مرشح، ثم يرتب الخطط المطابقة للساعات المطلوبة بالضبط ويحتفظ بما يصل إلى 50 خطة. Stage 2 يحسب 12 ميزة لسياق الخطة والمقررات الأخرى ويعيد التقييم باستخدام 43 ميزة. بعدها يجمع المحرك مؤشرات كل خطة ويمرّرها للترتيب النهائي. لكل مرحلة نموذجان للعلامة والرسوب، والترتيب النهائي محصور بالخطط المختصرة.
 
 الأهداف الحالية `final_mark` و`final_mark < 50`. بقيت شبكة المرشحين والأوزان والتحقق الزمني كما في المصدر؛ التدريب حتى 20243، والتحقق في 2023/2024، والتقييم المحفوظ في 20251/20252. لم يضف النقل تجربة تحسين أو اختيارًا بناءً على أرقام الاختبار. بيانات 2025 سبق استخدامها تاريخيًا وليست اختبارًا جديدًا أعمى.
 
@@ -120,7 +120,7 @@ Stage 1 يستعمل 33 ميزة لتقييم كل مرشح، ثم يجمع ال
 
 السياق الإضافي ملف JSON اختياري مهيأ بواسطة `ADVISOR_UI_INTEGRATION_CONTEXT_FILE`، وشكله `{"student": {...}, "courses": {...}}`. يجب توفير القيم والمصادر وتوقيت الساعات والسياسات المطلوبة فعليًا؛ لا تستنتج الواجهة القيم الناقصة.
 
-رد الجامعة المتوقع للتاريخ هو `part_id, rows[], finalization?`. الصف الإنتاجي يحتاج `degree_id, course_id, faculty_id, plan_requirement_type_id, course_credits, count, fail_count, retake_count, mark_sum, attempt_sum`. صيغة `CoursesStatistsic` غير المكتملة لا تُحوّل تخمينيًا. يجلب وضع الجامعة الرد ويتحقق من عقده؛ التاريخ المستخدم في التنبؤ هو الحزمة المحلية المبنية والمثبتة. استيراد تحديثات الجامعة ونشرها وتفعيلها يتم عبر إدارة التاريخ، دون كتابة تلقائية أثناء طلب توصية.
+رد الجامعة المتوقع للتاريخ هو `part_id, rows[], finalization?`. يحتاج صفّ التحديث إلى `degree_id, course_id, faculty_id, plan_requirement_type_id, course_credits, count, fail_count, retake_count, mark_sum`، ويُرفض الحقل القديم `attempt_sum`. صيغة `CoursesStatistsic` غير المكتملة لا تُحوّل تخمينيًا. يجلب وضع الجامعة الرد ويتحقق من عقده. يثبّت طلب التوصية نسخة التاريخ المحلية المتحقّق منها حتى انتهاء التنبؤ. استيراد تحديثات الجامعة ونشرها وتفعيلها يتم عبر إدارة التاريخ.
 
 تعرض الواجهة الطالب، الخطة المسجلة وتنبؤها، أفضل ثلاث خطط والمقارنة. تقييم الخطة الفعلية مسار محلي اختياري منفصل: يمكنه قراءة roster التسجيل وسجل المقررات والكتالوج وتنبؤات التقييم وحالة الطالب من Stable لكل طلب تقييم. لا تستبدل الخطة المسجلة مجموعة مرشحي API، وليست مصدرًا للمرشحين في التوصية الإنتاجية.
 
@@ -191,10 +191,11 @@ Stage 1 يستعمل 33 ميزة لتقييم كل مرشح، ثم يجمع ال
 | `src/data/building/{filter_common_students,build_student_course_enriched,build_temporal_split,build_registration_roster}.py` | نقل بناء البيانات وتكييف الاستيرادات والمسارات |
 | `src/features/{feature_contract,temporal_features,build_temporal_features,frozen_history,build_frozen_history}.py` | نقل الميزات والتاريخ؛ مصادر metadata نسبية |
 | `src/modeling/{training_config,train_models,shortlist_features,train_shortlist_models,build_artifact_manifest}.py` | تدريب الزوجين من الجديد، واستخراج الاعتماد الضروري من experiments ونشر manifest متوافق |
-| `src/recommendation/{two_stage_engine,two_stage_artifacts,inputs,constraints,course_status,plan_generation,plan_scoring,shortlist,ranking,ranking_policy,balance_policy,history_update,cumulative_history}.py` | مسار TwoStage الحالي؛ التحقق من الفائز الجديد ومرجع تفويض السياسة دون تغيير حسابها |
+| `src/recommendation/{two_stage_engine,two_stage_artifacts,inputs,registration_policy,constraints,course_status,plan_generation,plan_scoring,shortlist,ranking,ranking_policy,balance_policy,serving,history_update,cumulative_history}.py` | مسار TwoStage، الحسابات المشتركة، تثبيت تاريخ الطلب، والتحقق من أصول النموذج وسياسة الترتيب |
 | `src/grade_scale.py` | تحويل العلامات والنقاط الحالي دون تغيير |
-| `src/api/{app,schemas,service,settings,request_store,validation,student_adapter,courses_adapter,history_adapter}.py` | خدمة HTTP وعقودها وSQLite؛ إعدادات نسبية إلى جذر المشروع |
-| `src/api/adapters/{__init__,student,courses,history}.py`؛ `src/api/validators/{__init__,common,student,courses,history}.py` | المحولات والتحقق اللازمان للخدمة، مع توافق أسماء الاستيراد |
+| `src/api/{app,schemas,service,settings,request_store}.py` | خدمة HTTP وعقودها وإعداداتها وحالة الإدخال المنفصل في SQLite |
+| `src/api/adapters/{__init__,student,courses,history}.py`؛ `src/api/validators/{__init__,common,student,courses,history}.py` | المسارات الرئيسية لتحويل مدخلات الجامعة والتحقق من مصادرها وحقولها |
+| `src/api/{validation,student_adapter,courses_adapter,history_adapter}.py` | مسارات استيراد قديمة تمرّر الأسماء إلى تطبيقاتها الأصلية. للتكاملات الجديدة استخدم المسارات في [عقد API](docs/api_contract.md#python-imports). |
 | `src/evaluation/{__init__,evaluate_plan_gpa,observed_plan}.py` | تقييم جديد؛ فصل التنبؤ بالخطة المسجلة عن ربط نتائجها، ومنع طباعة معرفات الطلاب |
 | `src/{main,paths}.py` | نقطة تشغيل وترتيب اعتماديات ومسارات مركزية canonical |
 | `tools/__init__.py`؛ `tools/academic_advisor_streamlit/{__init__,ui_client,views,streamlit_app}.py` | واجهة تقييم مخصصة وعميل HTTP ومقارنات بمدخلات محققة |

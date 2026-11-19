@@ -174,3 +174,9 @@
 - Passed one verified history snapshot per built-in engine request into `src/recommendation/two_stage_engine.py`, preserving the public injected-engine call.
 - Added rollback, busy-worker and injected-engine checks in `tests/integration/test_api_stable.py`. All 16 before-and-after serving scenarios matched.
 - All 29 HTTP tests passed. The full suite had 996 passes, 2 known frozen-history filename failures and 2 skips.
+
+## 2026-11-19 — Phase 7 API compatibility audit and documentation
+- Audited four Python compatibility paths and retained them because downstream usage remains unverified.
+- Updated README, the architecture and API contract, and the pipeline map to reflect serving, ranking, and the 31/43 feature contracts.
+- Confirmed all 23 forwarded names and all 29 HTTP cases. Full suite matched Phase 6 with 996 passed, 2 known failures and 2 skips.
+- Recorded the consumer matrix and the actual Phase 4B, 5 and 6 sequence in the [Phase 7 report](reports/API_RECOMMENDATION_PHASE_7_REPORT.md).
